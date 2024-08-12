@@ -1,7 +1,6 @@
-''' Mouse_Data.py
-
-    Contains the Mouse_Data class that is used for analysing the MatLab data .txt files.
-    @Mik Schutte
+''' 
+variety of helper functions to transform raw BPOD and raw OE data to an aligned Dataframe
+@author: FlorianFreitag
 '''
 import numpy as np
 import pandas as pd
@@ -124,7 +123,7 @@ def BPOD_wrangle(raw_BPOD,ITI):
     return BPOD
 
 def Ephys_wrangle(cluster_group,clust,times,ITI,sample_freq):
-    #takes raw OE vectos and turns them into a Dataframe
+    #takes raw KS vectos and turns them into a Dataframe
     #selects only clusters that have the PHY good label
     good_cluster = cluster_group.query('group=="good"').loc[:,['cluster_id']]
     Ephys_raw = pd.DataFrame({'cluster_id': clust, 'times':times}, columns=['cluster_id', 'times'])
@@ -140,6 +139,7 @@ def Ephys_wrangle(cluster_group,clust,times,ITI,sample_freq):
     return Ephys_good
 
 def bin_Ephys(Ephys_good,bin_size=0.01):
+    # raw Kilosort has only data if a spike occoured, this transforms it into evenlz space dintervals and counts how manz spikes occoured 
 
     max_seconds = Ephys_good['seconds'].max()
     bin_edges = np.arange(0, max_seconds + bin_size, bin_size)
@@ -158,11 +158,16 @@ def bin_Ephys(Ephys_good,bin_size=0.01):
 
 
 def Add_Behv(Ephys_binned,BPOD,raw_BPOD,ITI):
+    # this matches the BPOD data to the KS data by aligning their timesatamps to the shared trigger (ITI start)
+    
     
     start = raw_BPOD['SessionData']['TrialStartTimestamp'] +ITI[0] - raw_BPOD['SessionData']['TrialStartTimestamp'][0] 
     end = raw_BPOD['SessionData']['TrialEndTimestamp'] + ITI[0] - raw_BPOD['SessionData']['TrialStartTimestamp'][0] 
     
     EPHYS_trimmed = Ephys_binned.loc[(Ephys_binned['time_bin'] <= end[-1]) & (Ephys_binned['time_bin'] >= start[0])]
+    # takes away all KS values before and after the behaviour session
+    
+    
     EPHYS_trimmed = EPHYS_trimmed.sort_values(by='time_bin').reset_index(drop=True)
     i = 0
     j = 0
@@ -179,6 +184,7 @@ def Add_Behv(Ephys_binned,BPOD,raw_BPOD,ITI):
     return(EPHYS_trimmed)
 
 def Add_trial(EPHYS_trimmed):
+    # this should not be a thing. the trial information is already present in the raw BPOD but here i reconstruct them becuase i could not figure out how to transfer them
     k=0
     trial =[]
     for i in range(len(EPHYS_trimmed)):
@@ -200,6 +206,7 @@ def Add_trial(EPHYS_trimmed):
 
 
 def Raw_to_df_all(cluster_group,clust,times,TTL_states,TTL_sample_times, sample_nums,sample_freq,raw_BPOD,bin_size=0.01):
+    #for the brave who trust this code completly 
     ITI = get_ITI_starts(TTL_states, TTL_sample_times, sample_nums,sample_freq)
     BPOD = BPOD_wrangle(raw_BPOD,ITI)
     Ephys_good = Ephys_wrangle(cluster_group,clust,times,ITI,sample_freq)
