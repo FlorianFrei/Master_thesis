@@ -1,5 +1,5 @@
 ''' 
-variety of helper functions to transform raw BPOD and raw OE data to an aligned Dataframe
+variety of helper functions to transform raw BPOD and raw KS data to an aligned Dataframe
 @author: FlorianFreitag
 '''
 import numpy as np
