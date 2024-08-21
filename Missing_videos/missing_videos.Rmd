@@ -16,7 +16,7 @@ library(tidyverse)
 library(purrr)
 
 
-source("C:/Users/deepl/Desktop/missing_video_helper.r")
+source("E:/Florian/Github/Master_thesis/Missing_videos/missing_video_helper.r")
 
 matpath = "C:/Users/deepl/Desktop/a/mat"
 creapath = "C:/Users/deepl/Desktop/a/times"
@@ -27,7 +27,6 @@ creapath = "C:/Users/deepl/Desktop/a/times"
 data <- mat_to_tibble(matpath)
 data <- add_times(data)
 creas <- load_creas_times(creapath)
-
 
 data <- data %>% filter(name=='HIT') %>% select(id,Behv,Trial2,timediff)
 ```
@@ -40,9 +39,10 @@ creas2 <- creas %>%
   group_map(~ match_within_group(.x, data %>% filter(id == .y$id[1])),.keep = T) %>%
   bind_rows()
 
-to_keep <- creas2 %>% left_join(data %>% ungroup() %>% select(!id), by = join_by(closest_hit_time==timediff)) %>% select(!closest_hit_idx) %>% mutate(timediff = CreationTime-closest_hit_time)  %>% filter(abs(timediff) < 5) %>% mutate(video = sprintf("%03d", video))
+to_keep <- creas2 %>% left_join(data %>% ungroup(), by = join_by(id,closest_hit_time==timediff)) %>% select(!closest_hit_idx) %>% mutate(timediff = CreationTime-closest_hit_time)  %>% filter(abs(timediff) < 5) %>% mutate(video = sprintf("%03d", video))
 
-to_keep
+to_keep %>% select(id,Trial2,video,Behv) %>% write_csv('C:/Users/deepl/Desktop/matched_videos.csv')
+
 ```
 
 
