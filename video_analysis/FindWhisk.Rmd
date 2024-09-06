@@ -1,0 +1,141 @@
+---
+title: "find whisk"
+output: html_document
+date: "2024-04-19"
+---
+
+```{r}
+library(tidyverse)
+datapath <-  "D:/try"
+Matching_videos <- read_csv("C:/Users/deepl/Desktop/a/matched_videos.csv")
+
+extract_filename <- function(filepath) {
+  filename_without_path <- basename(filepath)
+  filename_without_extension <- sub("\\.csv$", "", filename_without_path)
+  return(filename_without_extension)
+}
+
+load_data <- function(datapath){
+  list_of_files <- list.files(path = datapath,
+                            pattern = "[0-9]+\\.csv$",
+                            full.names = TRUE,recursive = T)
+  Data <- read_csv(list_of_files, id = 'group') %>% as_tibble(.name_repair = "universal")
+  Data <- Data %>%
+  mutate(filt = extract_filename(group)) %>% select(!group)
+  Data <- Data  %>% separate_wider_delim(cols = filt,delim="_", names=c('a','b','c')) %>% 
+    mutate(c = sprintf("%03d", as.numeric(c))) %>% unite('filt',c(a,b,c)) %>% rename(frame=bodyparts_coords)
+    
+  Data
+
+}
+
+
+Filter_data <- function(Data,Matching_videos){
+  len_filt <- Data %>% group_by(filt) %>% summarise(l = max(frame)) %>% filter(l > 698) %>% pull(filt)
+  vid_filt <- Matching_videos %>% unite('vid_filt',c(id,video))
+  Data <-Data  %>% filter(filt %in% vid_filt$vid_filt) %>% filter(filt %in% len_filt)
+  Data
+}
+
+Replace_low_like <- function(Data,like=0.95){
+  Data <- Data %>%
+  pivot_longer(
+    cols = -c(frame,filt), # Keep bodyparts_coords as is
+    names_to = c("number", ".value"), # Use the number and variable name as keys
+    names_pattern = "(.*)_(.*)" # Regex to extract the number and variable (x, y, likelihood)
+  ) %>% group_by(filt,number) %>% mutate(x = ifelse(likelihood < like,median(x),x),
+                                         y = ifelse(likelihood < like,median(x),x)) %>%
+  select(!likelihood) %>% 
+  pivot_wider(names_from = number,values_from = c(x,y), names_glue = "{number}_{.value}" ) %>%  select(
+    frame,filt,
+    order(colnames(.)[colnames(.) != "bodyparts_coords"])  # Keeps the columns in the desired order
+  )
+  Data
+}
+
+
+Normalize_to_bodypart <-function(Data, bodypart ='well'){
+  Data <- Data %>% pivot_longer(
+    cols = -c(frame,filt), # Keep bodyparts_coords as is
+    names_to = c("number", ".value"), # Use the number and variable name as keys
+    names_pattern = "(.*)_(.*)" ) %>% group_by(filt) %>%  mutate(norm_x =mean(ifelse(number==bodypart,x,NA),na.rm=T),
+                                             norm_y =mean(ifelse(number==bodypart,y,NA),na.rm=T),
+                                             x = x-norm_x,
+                                             y= y-norm_y)  %>% ungroup() %>% select(!c(norm_x,norm_y))
+  Data
+}
+find_whisk <- function(Data){
+  
+  Data <- Data %>% filter(number %in% c('sensor','whisker.tip')) %>% pivot_wider(names_from = number,values_from = c(x,y), names_glue = "{number}_{.value}" ) %>%
+  mutate(dist_x = whisker.tip_x - sensor_x, dist_y = whisker.tip_y - sensor_y) 
+
+  treshold <- Data %>%
+  filter(between(frame, 400, 510)) %>%
+  group_by(filt) %>%
+  mutate(med = mean(c(median(dist_y), max(dist_y))),
+         move = ifelse(dist_y > med, 1, 0)) %>%
+  filter(move == 1) %>%
+  slice_min(frame) %>%
+  select(filt, treshframe = frame)
+
+  mframe <- Data %>% left_join(treshold) %>% group_by(filt) %>%  filter(between(frame,treshframe-20,treshframe)) %>% slice_min(dist_y,with_ties = F) %>%
+  select(filt,mframe = frame)
+
+  Data <- Data %>% left_join(mframe)
+  Data
+}
+
+
+Data <- load_data(datapath)
+```
+
+
+```{r}
+# filter Data 
+
+Data <- Filter_data(Data,Matching_videos)
+Data <- Replace_low_like(Data,like=0.95)
+Data <- Normalize_to_bodypart(Data,'well')
+Data <- find_whisk(Data)
+Data %>% select(filt,mframe) %>% distinct()
+
+
+
+
+
+```
+
+
+```{r}
+
+
+# Get 20 random unique filt values
+set.seed(123)  # Ensure reproducibility
+random_filts <- sample(unique(Data$filt), 20)
+
+# Function to create a plot for each random filt value
+plot_function <- function(filt_value) {
+  # Filter the data for the current filt
+  data_filtered <- Data %>% filter(filt == filt_value)
+  med_value <- data_filtered %>%
+    filter(between(frame, 400, 510)) %>%
+    summarise(med = mean(c(median(dist_y), max(dist_y)))) %>%
+    pull(med)
+  
+  # Create the plot using existing mframe column
+  ggplot(data_filtered, aes(frame, dist_y)) +
+    geom_line() +
+    geom_smooth() +
+    geom_hline(aes(yintercept = med_value)) +
+    geom_vline(aes(xintercept = mframe),col='red') +
+    ggtitle(paste("Plot for filt:", filt_value))  # Add a title for clarity
+}
+
+# Apply the function to 20 random filt values and store the plots
+plots <- map(random_filts, plot_function)
+
+# To print all the plots (this will print them in sequence)
+walk(plots, print)
+
+```
+
