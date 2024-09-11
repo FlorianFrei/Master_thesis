@@ -263,6 +263,7 @@ def Raw_to_df_all(cluster_group,clust,times,TTL_states,TTL_sample_times, sample_
     #for the brave who trust this code completly 
     ITI = get_ITI_starts(TTL_states, TTL_sample_times, sample_nums,sample_freq)
     BPOD = BPOD_wrangle(raw_BPOD,ITI)
+    adjust_BPOD_with_dead_time(BPOD,ITI)
     Ephys_good = Ephys_wrangle(cluster_group,clust,times,ITI,sample_freq)
     Ephys_binned = bin_Ephys(Ephys_good,bin_size=0.01)
     EPHYS_trimmed = Add_Behv(Ephys_binned, BPOD, raw_BPOD, ITI)
