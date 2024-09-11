@@ -7,7 +7,7 @@ Created on Mon Aug  5 15:15:16 2024
 
 import numpy as np
 import pandas as pd
-from load_mat import*
+from helpers import*
 
 #%%
 cluster_group= pd.read_csv('E:/Florian/SNA-127316_2023-12-16_14-41-01/sorted/phy/cluster_group.tsv',sep = '\t')
@@ -27,6 +27,7 @@ ITI = get_ITI_starts(TTL_states, TTL_sample_times, sample_nums,sample_freq)
 
 #%%
 BPOD = BPOD_wrangle(raw_BPOD,ITI)
+BPOD = adjust_BPOD_with_dead_time(BPOD, ITI)
 
 #%%
 

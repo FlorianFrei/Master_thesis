@@ -72,6 +72,7 @@ def get_ITI_starts(TTL_states,TTL_sample_times, sample_nums,sample_freq):
     t1['time'] = TTL_sample_times
     t2 = t1[t1['state'].isin([1])]
     ITI =(t2['time'] - sample_nums[0]) /  sample_freq
+    ITI.reset_index(drop=True,inplace=True)
     return ITI
 
 
@@ -121,6 +122,59 @@ def BPOD_wrangle(raw_BPOD,ITI):
     BPOD['state_len'] = BPOD[1] - BPOD[0]
     BPOD['Cont_start'] = BPOD['Cont_time']-BPOD['state_len']
     return BPOD
+
+def adjust_BPOD_with_dead_time(BPOD, ITI):
+    #makes sure that The BPOD ITI start is always aligned to the ITI TTL signal in OE
+  
+    ITI_idx = 0
+    # List to store new rows
+    new_rows = []
+    
+    # Iterate through BPOD and identify ITI mismatches
+    for i in range(len(BPOD)):  # Start from 1 because we need to check the previous row
+        row = BPOD.iloc[i]
+        
+        if row['type'] == 'ITI':
+            # Find the true ITI start time
+            true_iti = ITI.iloc[ITI_idx]
+            ITI_idx += 1
+            
+            # If BPOD cont_start is earlier than true ITI, we have dead time
+            if row['Cont_start'] < true_iti and BPOD.iloc[i - 1]['type'] == 'dead_time':
+                dead_time2 = true_iti - row['Cont_start']
+                
+                # Add a 'dead_time2' row with cont_start from previous row's cont_time
+                prev_row = BPOD.iloc[i - 1]
+                new_row = {
+                    'type': 'dead_time2',
+                    'Cont_start': prev_row['Cont_time'],
+                    'Cont_time': true_iti,
+                    'Trial': prev_row['Trial'],   # Carry over trial from the previous row
+                    0: prev_row[1],           # '0' is '1' from the previous row
+                    1: prev_row[1] + (true_iti - prev_row['Cont_time']),  # Calculate '1' using state_len
+                    'state_len': true_iti - prev_row['Cont_time']  # Calculate the new state_len
+                }
+                new_rows.append((i, new_row))
+                
+                # Adjust ITI row's Cont_start and Cont_time
+                BPOD.at[i, 'Cont_start'] = true_iti
+                BPOD.at[i, 'Cont_time'] += dead_time2  # Adjust the Cont_time based on lost time
+                BPOD.at[i, 'state_len'] = BPOD.at[i, 'Cont_time'] - BPOD.at[i, 'Cont_start']  # Update state_len
+
+                # Now adjust the following rows
+                for j in range(i + 1, len(BPOD)):
+                    BPOD.at[j, 'Cont_start'] += dead_time2
+                    BPOD.at[j, 'Cont_time'] += dead_time2
+                    BPOD.at[j, 'state_len'] = BPOD.at[j, 'Cont_time'] - BPOD.at[j, 'Cont_start']  # Update state_len
+    
+    # Insert new 'dead_time2' rows into the BPOD dataframe
+    shift = 0  # Track how much we are shifting the index as rows are inserted
+    for idx, new_row in new_rows:
+        idx += shift  # Adjust index by the shift since we're adding rows
+        BPOD = pd.concat([BPOD.iloc[:idx], pd.DataFrame([new_row]), BPOD.iloc[idx:]]).reset_index(drop=True)
+        shift += 1  # Increment shift since we inserted a row
+    return BPOD
+
 
 def Ephys_wrangle(cluster_group,clust,times,ITI,sample_freq):
     #takes raw KS vectos and turns them into a Dataframe
