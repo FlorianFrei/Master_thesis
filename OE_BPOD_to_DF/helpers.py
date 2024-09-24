@@ -176,20 +176,16 @@ def adjust_BPOD_with_dead_time(BPOD, ITI):
     return BPOD
 
 
-def Ephys_wrangle(cluster_group,clust,times,ITI,sample_freq):
-    #takes raw KS vectos and turns them into a Dataframe
+def Ephys_wrangle(cluster_info,clust,times,sample_freq,surface_estimate):
+    #takes raw KS vectos and turns them into a Dataframe  
     #selects only clusters that have the PHY good label
-    good_cluster = cluster_group.query('group=="good"').loc[:,['cluster_id']]
+    low_lim = surface_estimate - 1500
+    up_lim = surface_estimate + 100
+    
+    good_cluster = cluster_info.query('group=="good"').query('depth>@low_lim').query('depth<@up_lim').loc[:,['cluster_id']]
     Ephys_raw = pd.DataFrame({'cluster_id': clust, 'times':times}, columns=['cluster_id', 'times'])
     Ephys_raw = Ephys_raw.assign(seconds = Ephys_raw['times']/sample_freq)
-    Ephys_good = (
-        Ephys_raw.merge(good_cluster, 
-                  on=['cluster_id'],
-                  how='left', 
-                  indicator=True)
-        .query('_merge == "both"')
-        .drop(columns='_merge')
-    )
+    Ephys_good = Ephys_raw.merge(good_cluster, on=['cluster_id'],how='inner')
     return Ephys_good
 
 def bin_Ephys(Ephys_good,bin_size=0.01):
