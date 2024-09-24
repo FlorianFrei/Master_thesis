@@ -8,6 +8,8 @@ Created on Tue Sep 24 17:43:06 2024
 import numpy as np
 import pandas as pd
 import zetapy as zp
+import itertools
+from tqdm import tqdm
 
 def Zetatest_unit(Data, State,unit,Plot=False, window = 0.4,lag=0.2):
     timess = np.asarray(Data.loc[Data[Data.Trialtype==str(State)].groupby('Trial')['time_bin'].idxmin()]['time_bin'])[np.newaxis].T-lag
@@ -28,4 +30,18 @@ def Zetatest_all(Data,State,window=0.4,lag=0.2):
         p_vals = pd.DataFrame.from_records(p_vals,columns=['p_val', 'unit'])
         return p_vals
     else: print('FU')
-    
+
+def ZetaMass(Data,Behv,State,lag, window = 2):
+    output_data1 = []          
+    unique_combinations = list(itertools.product(Data['Mouse'].unique(), Data['Day'].unique()))
+    for Mouse, Day in tqdm(unique_combinations, desc="Processing Mice and Days"):
+        Data2 = Data.loc[(Data['Day'] == Day) & (Data['Mouse'] == Mouse)]
+        ZTd1 = Zetatest_all(Data2.loc[Data2['Behv'] == Behv], State, window=None, lag=0.5)
+        if ZTd1 is not None:
+            for index, row in ZTd1.iterrows():
+                output_data1.append([Day, Mouse, row['p_val'], row['unit']])
+        else:
+            print(f"No data found for Day: {Day}, Mouse: {Mouse}")
+
+    Zetatested = pd.DataFrame(output_data1, columns=['Day', 'Mouse', 'p_val', 'unit'])
+    return(Zetatested)
