@@ -15,9 +15,9 @@ def Zetatest_unit(Data, State,unit,Plot=False, window = 0.4,lag=0.2):
     timess = np.asarray(Data.loc[Data[Data.Trialtype==str(State)].groupby('Trial')['time_bin'].idxmin()]['time_bin'])[np.newaxis].T-lag
     Spikes = np.asarray(Data.query('cluster_id=='+ str(unit)).loc[:,'time_bin'])[np.newaxis].T
     if Plot==False:
-        dblZetaP = zp.zetatest(Spikes, timess,dblUseMaxDur=window, intResampNum = 5000)[0] 
+        dblZetaP = zp.zetatest(Spikes, timess,dblUseMaxDur=window, intResampNum = 1000)[0] 
     else:
-        dblZetaP = zp.zetatest(Spikes, timess,dblUseMaxDur=window,boolPlot=True,intResampNum = 5000)[0] 
+        dblZetaP = zp.zetatest(Spikes, timess,dblUseMaxDur=window,boolPlot=True,intResampNum = 1000)[0] 
     return dblZetaP,unit
 
 
@@ -36,7 +36,7 @@ def ZetaMass(Data,Behv,State,lag, window = 2):
     unique_combinations = list(itertools.product(Data['Mouse'].unique(), Data['Day'].unique()))
     for Mouse, Day in tqdm(unique_combinations, desc="Processing Mice and Days"):
         Data2 = Data.loc[(Data['Day'] == Day) & (Data['Mouse'] == Mouse)]
-        ZTd1 = Zetatest_all(Data2.loc[Data2['Behv'] == Behv], State, window=None, lag=0.5)
+        ZTd1 = Zetatest_all(Data2.loc[Data2['Behv'] == Behv], State, window=window, lag=lag)
         if ZTd1 is not None:
             for index, row in ZTd1.iterrows():
                 output_data1.append([Day, Mouse, row['p_val'], row['unit']])

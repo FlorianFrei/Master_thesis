@@ -13,7 +13,7 @@ load_data <- function(datapath,metapath){
   list_of_data <- list.files(path = datapath,
                              pattern = "\\.csv$",
                              full.names = TRUE)
-  Data <- read_csv(list_of_data, id = 'group')
+  Data <- read_csv(list_of_data, id = 'group') 
   Data <- Data %>% mutate(id = str_extract(Data$group, "M\\d+_\\d+"))
   
   list_of_meta <- list.files(path = metapath,
@@ -26,9 +26,9 @@ load_data <- function(datapath,metapath){
   # adds more data such as the behaviour,depth or Hit/miss based on which Trialtypes where present 
   Data <- Data %>% mutate(Trial = sprintf('%03d',trial))
   Data <- Data %>% unite('Trial2',c(id,Trial),remove=F) %>% group_by(Trial2) %>%  mutate(Behv = case_when(
-    'W2T_Audio' %in% Trialtype ~ "W2T",
-    'A2L_Audio' %in% Trialtype ~ "A2L",
-    'PC_Audio' %in% Trialtype ~"PC", 
+    any(Trialtype %in% c('Audio', 'W2T_Audio')) ~ "W2T",
+    any(Trialtype %in% c('Airpuff', 'A2L_Audio')) ~ "A2L",
+    any(Trialtype %in% c('PC_Audio', 'Airpuff2')) ~ "PC", 
     .default = "WTF")) %>% mutate(succ = ifelse('HIT' %in% Trialtype,'Hit','Miss')) %>% ungroup() %>%  unite('cluster_id2',c(cluster_id,id),remove=F) %>% mutate(depthcat = ifelse(depth < ((1000)*(2/3)),"L5",'L3'))
   Data
 }

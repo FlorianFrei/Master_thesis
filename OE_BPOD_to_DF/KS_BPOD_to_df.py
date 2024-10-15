@@ -8,8 +8,8 @@ Created on Mon Aug  5 15:15:16 2024
 import numpy as np
 import pandas as pd
 from helpers import*
-basefolder ="F:/copydaya\M9_1/M9_SNA-135383_19092024_1_g0_imec1"
-mat_name = 'maybeM9_MA_20240919_180430'
+basefolder ="F:/copydaya\M8_1"
+mat_name = 'M8_MA_20240917_181329'
 #%% load data
 
 
@@ -38,7 +38,7 @@ Ephys_good = Ephys_wrangle(cluster_info,clust,times,sample_freq,surface_estimate
 
 #%% bin EPhys
 
-Ephys_binned = bin_Ephys(Ephys_good,bin_size=0.01)
+Ephys_binned = bin_Ephys(Ephys_good,bin_size=0.001)
 #%% add BEHV
 EPHYS_trimmed = Add_Behv(Ephys_binned, BPOD, raw_BPOD, ITI)
 
@@ -48,5 +48,5 @@ EPHYS_trimmed2 = Add_trial(EPHYS_trimmed)
 
 #%% to csv
 
-EPHYS_trimmed2.to_csv(basefolder + str('/M9_1.csv'))
+EPHYS_trimmed2.to_csv(basefolder + str('/M8_1_detail.csv'))
 

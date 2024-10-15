@@ -1,0 +1,129 @@
+---
+title: "Zeta_analysis"
+output: html_document
+date: "2024-09-25"
+---
+
+```{r}
+library(tidyverse)
+W2T <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests/W2T.csv") %>% mutate(Behv = 'W2T')
+A2L <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests/A2L.csv") %>% mutate(Behv = 'A2L')
+PC <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests/PC.csv") %>% mutate(Behv = 'PC')
+
+Data <- rbind(W2T,A2L,PC) %>% unite('unit', c(unit, Mouse,Day))  %>% filter(p_val < 0.05) %>% select(-X,-p_val)
+```
+
+
+
+`
+
+
+```{r}
+
+Unit_Behv <- Data %>%  filter(Behv != 'W2T')
+
+Unit_Behv <- Unit_Behv %>%
+  group_by(unit) %>%                          # Group by unit
+  summarise(Behv_combined = paste(unique(Behv), collapse = "_"))
+
+Unit_Behv %>% write_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests/Unit_behv.csv")
+```
+
+```{r}
+
+Data2 <- Data 
+
+Data
+
+# Create a wide format matrix showing units vs behaviors
+unit_behv_matrix <- Data2 %>%
+  mutate(presence = 1) %>%
+  pivot_wider(names_from = Behv, values_from = presence, values_fill = 0)
+
+# Compute the overlap (shared units) between behaviors
+overlap_matrix <- as.data.frame(crossprod(as.matrix(select(unit_behv_matrix, -unit))))
+
+# Add behavior names to rows and columns
+overlap_matrix$Behv1 <- rownames(overlap_matrix)
+overlap_matrix <- overlap_matrix %>%
+  pivot_longer(-Behv1, names_to = "Behv2", values_to = "SharedUnits")
+
+# Calculate the total number of units for each behavior
+total_units <- Data2 %>%
+  group_by(Behv) %>%
+  summarise(TotalUnits = n_distinct(unit))
+
+# Merge the overlap matrix with the total units for both Behv1 and Behv2
+overlap_matrix <- overlap_matrix %>%
+  left_join(total_units, by = c("Behv1" = "Behv")) %>%
+  rename(TotalUnits_Behv1 = TotalUnits) %>%
+  left_join(total_units, by = c("Behv2" = "Behv")) %>%
+  rename(TotalUnits_Behv2 = TotalUnits)
+
+# Calculate the fraction of shared units relative to the minimum total units between Behv1 and Behv2
+overlap_matrix <- overlap_matrix %>%
+  mutate(FractionShared = SharedUnits / pmin(TotalUnits_Behv1, TotalUnits_Behv2))  # Use minimum to ensure symmetry
+
+# Plot the fraction of shared units
+ggplot(overlap_matrix, aes(x = Behv1, y = Behv2, fill = FractionShared)) +
+  geom_tile() +
+  geom_text(aes(label = sprintf("%.2f", FractionShared)), size = 4, color = "black") +  # Add numbers inside tiles
+  labs(title = "Fraction of Shared Units Between Behaviors",
+       x = "Behavior 1",
+       y = "Behavior 2",
+       fill = "Fraction Shared") +
+  scale_fill_gradient(low = 'beige', high = 'red', limits = c(0.55,1), breaks = c(0.55,1) ,na.value = "darkred")+
+  theme_void() +
+  xlab(element_blank())+
+  ylab(element_blank())+
+  ggtitle('Fraction of shared units')+
+  theme( strip.background = element_blank(),
+         axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+  theme(plot.title = element_text(hjust=0.5,size=20))
+ggsave("C:/Users/deepl/Desktop/com_Data/figures/sharedunits1.tiff",bg='white')
+
+
+unit_behv_matrix <- Data2 %>% 
+  mutate(presence = 1) %>%
+  pivot_wider(names_from = Behv, values_from = presence, values_fill = 0)
+
+# Compute the overlap (shared units) between behaviors
+overlap_matrix <- as.data.frame(crossprod(as.matrix(select(unit_behv_matrix, -unit))))
+
+# Add behavior names to rows and columns
+overlap_matrix$Behv1 <- rownames(overlap_matrix)
+overlap_matrix <- overlap_matrix %>%
+  pivot_longer(-Behv1, names_to = "Behv2", values_to = "SharedUnits")
+
+total_units <- Data2 %>%
+  group_by(Behv) %>%
+  summarise(TotalUnits = n_distinct(unit))
+
+ov2 <- overlap_matrix %>% left_join(total_units,by = join_by(Behv1 ==Behv)) %>% mutate(fraction = SharedUnits/TotalUnits)
+ggplot(ov2, aes(x = Behv1, y = Behv2, fill = fraction)) +
+  geom_tile()+
+  theme_minimal()+
+   geom_text(aes(label = sprintf("%.2f", fraction)), size = 4, color = "black") +  # Add numbers inside tiles
+  labs(title = "Fraction of Shared Units Between Behaviors",
+       x = "Behavior 1",
+       y = "Behavior 2",
+       fill = "Fraction Shared") +
+  scale_fill_gradient(low = 'beige', high = 'red', limits = c(0.24,1), breaks = c(0.24,1) ,na.value = "black")+
+  theme_void() +
+  xlab(element_blank())+
+  ylab(element_blank())+
+  ggtitle('Fraction of shared units')+
+  theme( strip.background = element_blank(),
+         axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+  theme(plot.title = element_text(hjust=0.5,size=20))
+ggsave("C:/Users/deepl/Desktop/com_Data/figures/sharedunits2_regular.tiff")
+
+
+
+```
+
+
+
+

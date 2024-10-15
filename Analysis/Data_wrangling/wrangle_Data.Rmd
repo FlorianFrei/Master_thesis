@@ -9,27 +9,28 @@ source("E:/Florian/Github/Master_thesis/Analysis/Data_wrangling/wrangling_helper
 ```
 
 ```{r}
-Data <- load_data(datapath = "C:/Users/deepl/Desktop/batch3/Data", metapath = "C:/Users/deepl/Desktop/batch3/Meta")
+Data <- load_data(datapath = "C:/Users/deepl/Desktop/batch3/zoom/data", metapath = "C:/Users/deepl/Desktop/batch3/zoom/meta")
 combcont <- Align_all(Data)
 Trialless <- avg_trials(combcont, bin_size = 0.01)
 ```
+
 ```{r}
 getwd()
 
-Data %>% write_csv("C:/Users/deepl/Desktop/batch3/wrangled_Data/Data.csv")
-combcont %>% write_csv("C:/Users/deepl/Desktop/batch3/wrangled_Data/combcont.csv")
-Trialless %>% write_csv("C:/Users/deepl/Desktop/batch3/wrangled_Data/Trialless.csv")
+Data %>% write_csv("C:/Users/deepl/Desktop/batch3/zoom/wrangled_Data/Data.csv")
+combcont %>% write_csv("C:/Users/deepl/Desktop/batch3/zoom/wrangled_Data/combcont.csv")
+Trialless %>% write_csv("C:/Users/deepl/Desktop/batch3/zoom/wrangled_Data/Trialless.csv")
 
 
 ```
 
 ```{r}
-Data %>% filter(event_count > 0) %>% tidyr::separate_wider_delim(id, delim = '_', names = c('Mouse','Day')) %>%  select(Mouse,Day, cluster_id,time_bin,event_count,Trialtype,Behv,Trial)  %>% uncount(weights = event_count) %>% mutate( time_bin = time_bin  + runif(n(), min = 0.001, max = 0.002) ) %>% write_csv("C:/Users/deepl/Desktop/batch3/wrangled_Data/Zetadata.csv")
+Data %>% filter(event_count > 0) %>% tidyr::separate_wider_delim(id, delim = '_', names = c('Mouse','Day')) %>%  select(Mouse,Day, cluster_id,time_bin,event_count,Trialtype,Behv,Trial)  %>% uncount(weights = event_count) %>% mutate( time_bin = time_bin  + runif(n(), min = 0.001, max = 0.002) ) %>% write_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zetadata.csv")
 ```
 
 
 ```{r}
-
+Trialless
 ```
 
 `
