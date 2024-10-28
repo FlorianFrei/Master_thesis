@@ -38,7 +38,7 @@ Ephys_good = Ephys_wrangle(cluster_info,clust,times,sample_freq,surface_estimate
 
 #%% bin EPhys
 
-Ephys_binned = bin_Ephys(Ephys_good,bin_size=0.001)
+Ephys_binned = bin_Ephys(Ephys_good,bin_size=0.01)
 #%% add BEHV
 EPHYS_trimmed = Add_Behv(Ephys_binned, BPOD, raw_BPOD, ITI)
 
@@ -48,5 +48,5 @@ EPHYS_trimmed2 = Add_trial(EPHYS_trimmed)
 
 #%% to csv
 
-EPHYS_trimmed2.to_csv(basefolder + str('/M8_1_detail.csv'))
+EPHYS_trimmed2.to_csv(basefolder + str('/M8_1_new.csv'))
 

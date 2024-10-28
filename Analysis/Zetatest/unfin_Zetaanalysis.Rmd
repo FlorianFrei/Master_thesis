@@ -10,7 +10,7 @@ W2T <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests/W2T.cs
 A2L <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests/A2L.csv") %>% mutate(Behv = 'A2L')
 PC <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests/PC.csv") %>% mutate(Behv = 'PC')
 
-Data <- rbind(W2T,A2L,PC) %>% unite('unit', c(unit, Mouse,Day))  %>% filter(p_val < 0.05) %>% select(-X,-p_val)
+Data <- rbind(W2T,A2L,PC) %>% unite('unit', c(unit, Mouse,Day))  %>% filter(p_val < 0.05/3) %>% select(-X,-p_val)
 ```
 
 
@@ -20,17 +20,17 @@ Data <- rbind(W2T,A2L,PC) %>% unite('unit', c(unit, Mouse,Day))  %>% filter(p_va
 
 ```{r}
 
-Unit_Behv <- Data %>%  filter(Behv != 'W2T')
-
-Unit_Behv <- Unit_Behv %>%
+Unit_behv <- Data %>%
   group_by(unit) %>%                          # Group by unit
   summarise(Behv_combined = paste(unique(Behv), collapse = "_"))
 
-Unit_Behv %>% write_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests/Unit_behv.csv")
+Unit_Behv <- Data %>% left_join(Unit_behv) %>% rename(ZETA_Behv = Behv)
+
+Unit_Behv %>% write_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Unit_Behv.csv")
 ```
 
 ```{r}
-
+Unit_Behv %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / sum(n))*100)
 Data2 <- Data 
 
 Data
@@ -118,9 +118,9 @@ ggplot(ov2, aes(x = Behv1, y = Behv2, fill = fraction)) +
          axis.text=element_text(size=12),
           axis.title=element_text(size=20,face="bold"))+
   theme(plot.title = element_text(hjust=0.5,size=20))
-ggsave("C:/Users/deepl/Desktop/com_Data/figures/sharedunits2_regular.tiff")
+#ggsave("C:/Users/deepl/Desktop/com_Data/figures/sharedunits2_regular.tiff")
 
-
+ov2
 
 ```
 
