@@ -35,13 +35,14 @@ Data = pd.read_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zetadata.csv")
 #     
 # =============================================================================
 #%% Zeta_all
-W2T = ZetaMass(Data,'W2T','HIT',lag = 0.3, window = 0.3)
-A2L = ZetaMass(Data,'A2L','Airpuff',lag=0.1, window = 0.5)
-PC = ZetaMass(Data,'PC','Airpuff2',lag=0.1, window = 0.5)
-
+W2T = ZetaMass(Data,'W2T','HIT',lag = 0.01, window = 0.3)
+A2L = ZetaMass(Data,'A2L','Airpuff',lag=0.01, window = 0.3)
+PC = ZetaMass(Data,'PC','Airpuff2',lag=0.01, window = 0.3)
+HIT = ZetaMass(Data,'W2T','HIT',lag=0.3, window = 0.3)
 
 #%%
 basefolder = "C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests"
 W2T.to_csv(basefolder + str('/W2T.csv'))
 A2L.to_csv(basefolder + str('/A2L.csv'))
 PC.to_csv(basefolder + str('/PC.csv'))
+HIT.to_csv(basefolder + str('/HIT.csv'))
