@@ -38,11 +38,11 @@ Data = pd.read_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zetadata.csv")
 W2T = ZetaMass(Data,'W2T','HIT',lag = 0.01, window = 0.3)
 A2L = ZetaMass(Data,'A2L','Airpuff',lag=0.01, window = 0.3)
 PC = ZetaMass(Data,'PC','Airpuff2',lag=0.01, window = 0.3)
-HIT = ZetaMass(Data,'W2T','HIT',lag=0.3, window = 0.3)
+Whisk = ZetaMass(Data,'W2T','HIT',lag=0.3, window = 0.3)
 
 #%%
-basefolder = "C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests"
+basefolder = "C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests_4cat"
 W2T.to_csv(basefolder + str('/W2T.csv'))
 A2L.to_csv(basefolder + str('/A2L.csv'))
 PC.to_csv(basefolder + str('/PC.csv'))
-HIT.to_csv(basefolder + str('/HIT.csv'))
+Whisk.to_csv(basefolder + str('/Whisk.csv'))

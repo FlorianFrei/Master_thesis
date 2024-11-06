@@ -44,8 +44,6 @@ ov2 <-overlap_matrix %>% rownames_to_column('Behv1') %>%
   pivot_longer(-Behv1, names_to = "Behv2", values_to = "SharedUnits") %>% left_join(Data %>% count(Behv),by = c("Behv1" = "Behv")) %>%  rename(TotalUnits = n) %>% mutate(fraction = SharedUnits/TotalUnits)
 
 
-
-
 ggplot(ov2, aes(x = Behv1, y = Behv2, fill = fraction)) +
   geom_tile()+
   theme_minimal()+
@@ -64,11 +62,6 @@ ggplot(ov2, aes(x = Behv1, y = Behv2, fill = fraction)) +
           axis.title=element_text(size=20,face="bold"))+
   theme(plot.title = element_text(hjust=0.5,size=20))
 #ggsave("C:/Users/deepl/Desktop/com_Data/figures/sharedunits2_regular.tiff")
-
-
-
-
-
 ```
 
 
