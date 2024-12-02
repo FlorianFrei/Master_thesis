@@ -181,7 +181,7 @@ def Ephys_wrangle(cluster_info,clust,times,sample_freq,surface_estimate):
     low_lim = surface_estimate - 1500
     up_lim = surface_estimate + 100
     
-    good_cluster = cluster_info.query('group=="good"').query('depth>@low_lim').query('depth<@up_lim').loc[:,['cluster_id']]
+    good_cluster = cluster_info.query('group == "good" | group == "mua"').query('depth>@low_lim').query('depth<@up_lim').loc[:,['cluster_id']]
     Ephys_raw = pd.DataFrame({'cluster_id': clust, 'times':times}, columns=['cluster_id', 'times'])
     Ephys_raw = Ephys_raw.assign(seconds = Ephys_raw['times']/sample_freq)
     Ephys_good = Ephys_raw.merge(good_cluster, on=['cluster_id'],how='inner')
@@ -221,15 +221,18 @@ def Add_Behv(Ephys_binned,BPOD,raw_BPOD,ITI):
     i = 0
     j = 0
     trialtype = []
+    trial = []
     
     while i < len(EPHYS_trimmed) and j < len(BPOD):
         if BPOD['Cont_start'][j] <= EPHYS_trimmed.iloc[i, 1] <= BPOD['Cont_time'][j]:
             trialtype.append(BPOD['type'][j])
+            trial.append(BPOD['Trial'][j])
             i += 1
         else:
             j += 1
             print(j)
     EPHYS_trimmed['Trialtype'] = trialtype 
+    EPHYS_trimmed['trial'] = trial 
     return(EPHYS_trimmed)
 
 def Add_trial(EPHYS_trimmed):

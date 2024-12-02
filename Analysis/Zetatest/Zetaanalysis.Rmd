@@ -6,12 +6,14 @@ date: "2024-09-25"
 # load Data
 ```{r}
 library(tidyverse)
-W2T <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests/W2T.csv") %>% mutate(Behv = 'W2T')
-A2L <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests/A2L.csv") %>% mutate(Behv = 'A2L')
-PC <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests/PC.csv") %>% mutate(Behv = 'PC')
+W2T <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests_4cat/W2T.csv") %>% mutate(Behv = 'W2T')
+A2L <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests_4cat/A2L.csv") %>% mutate(Behv = 'A2L')
+PC <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests_4cat/PC.csv") %>% mutate(Behv = 'PC')
+Whisk <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests_4cat/HIT.csv") %>% mutate(Behv = 'Whisk')
 
-Data <- rbind(W2T,A2L,PC) %>% unite('unit', c(unit, Mouse,Day))  %>% filter(p_val < 0.05/3) %>% select(-X,-p_val)
+Data <- rbind(W2T,A2L,PC,Whisk) %>% unite('unit', c(unit, Mouse,Day))  %>% filter(p_val < 0.05/4) %>% select(-X,-p_val)
 Data %>% group_by(unit) %>% summarise(Behv_combined = paste(unique(Behv), collapse = "_")) %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / sum(n))*100)
+Data %>% count(Behv)
 ```
 #wrangle and save
 ```{r}
@@ -20,7 +22,7 @@ Unit_behv <- Data %>%
   group_by(unit) %>%                          # Group by unit
   summarise(Behv_combined = paste(unique(Behv), collapse = "_"))
 
-no_W2T  <- Data %>% filter(Behv != 'W2T') %>% 
+no_W2T  <- Data %>% filter(Behv != c('W2T','Whisk')) %>% 
   group_by(unit) %>%                          # Group by unit
   summarise(Behv_combined2 = paste(unique(Behv), collapse = "_"))
 

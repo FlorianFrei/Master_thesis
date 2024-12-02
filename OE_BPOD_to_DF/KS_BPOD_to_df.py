@@ -8,8 +8,8 @@ Created on Mon Aug  5 15:15:16 2024
 import numpy as np
 import pandas as pd
 from helpers import*
-basefolder ="F:/copydaya\M8_1"
-mat_name = 'M8_MA_20240917_181329'
+basefolder ="E:/Florian/Data/batch3/M9_3"
+mat_name = 'M9_MA_20240921_191122'
 #%% load data
 
 
@@ -44,9 +44,9 @@ EPHYS_trimmed = Add_Behv(Ephys_binned, BPOD, raw_BPOD, ITI)
 
 
 #%% re-add trials
-EPHYS_trimmed2 = Add_trial(EPHYS_trimmed)
+#EPHYS_trimmed2 = Add_trial(EPHYS_trimmed)
 
 #%% to csv
 
-EPHYS_trimmed2.to_csv(basefolder + str('/M8_1_new.csv'))
+EPHYS_trimmed.to_csv(basefolder + str('/M9_3.csv'))
 
