@@ -8,8 +8,8 @@ Created on Mon Aug  5 15:15:16 2024
 import numpy as np
 import pandas as pd
 from helpers import*
-basefolder ="E:/Florian/Data/batch3/M9_3"
-mat_name = 'M9_MA_20240921_191122'
+basefolder ="E:/Florian/Data/Opto_1/MLa45_1"
+mat_name = 'MLA45_OptoAir_20241120_185710'
 #%% load data
 
 
@@ -48,5 +48,5 @@ EPHYS_trimmed = Add_Behv(Ephys_binned, BPOD, raw_BPOD, ITI)
 
 #%% to csv
 
-EPHYS_trimmed.to_csv(basefolder + str('/M9_3.csv'))
+EPHYS_trimmed.to_csv(basefolder + str('/M7_3.csv'))
 

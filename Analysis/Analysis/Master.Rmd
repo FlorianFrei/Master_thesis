@@ -1,0 +1,413 @@
+---
+title: "Master"
+output:
+  html_document: default
+  pdf_document: default
+date: "2024-09-25"
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(message = F, warning = F)
+```
+
+#load packages
+```{r}
+library(tidyverse)
+source("E:/Florian/Github/Master_thesis/Analysis/Analysis/Master_helper.R")
+```
+
+# load data
+```{r}
+Data <- data.table::fread("E:/Florian/Aligned_Data/All_sessions/wrangled_data/Data.csv", showProgress = T)
+combcont <- read.csv("E:/Florian/Aligned_Data/All_sessions/wrangled_data/combcont.csv")
+Trialless <- read_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Trialless.csv")
+#Zeta <- read_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Unit_Behv.csv")
+```
+
+# overview plots
+```{r}
+Plot_overview(Trialless ,orderby_Behv = 'A2L',by_time = F, theme_smo = theme_minimal())
+#ggsave('C:/Users/deepl/Desktop/com_Data/figures/overview_7_12_bigtext.tiff',bg='white',width = 12,height = 7)
+Plot_overview(Trialless,orderby_Behv = 'A2L',by_time = T, theme_smo = theme_minimal())
+#ggsave('C:/Users/deepl/Desktop/com_Data/figures/overview_byTime.tiff',bg='white')
+
+
+
+
+plot_overview_perID(Trialless, save="E:/Florian/Aligned_Data/All_sessions/wrangled_Data/overviewplots")
+
+Data %>% filter(group=='good') %>% group_by(id) %>% distinct(cluster_id2,id) %>% count(id)
+```
+
+# Layer plots
+```{r}
+
+
+Layerd <- add_layers(Trialless,depthpath = "E:/Florian/Aligned_Data/Analysable_data/depths")
+
+Layerd %>% ggplot(aes(dist_surf,fill=Layer_fine))+
+  geom_histogram(binwidth=20)
+
+
+Layerd %>% filter(Layer %in% c('L2/3','L5')) %>% filter(between(rel_time,-1,1)) %>% group_by(Layer, Behv,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='sienna2',linetype = 'dashed')+
+    facet_grid(Layer~Behv)+
+    theme_minimal()+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+
+Layerd %>% filter(Layer_fine %in% c('L1','L2/3','L5A','L5B','L6')) %>% filter(between(rel_time,-1,1)) %>% group_by(Layer_fine, Behv,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='sienna2',linetype = 'dashed')+
+    facet_grid(Layer_fine~Behv)+
+    theme_minimal()+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+
+Layerd  %>%
+  mutate(Zscore =  Zscore + case_when(
+    Layer_fine == 'L1' ~ 8,
+    Layer_fine == 'L2/3' ~ 6,
+    Layer_fine == 'L5A' ~ 4,
+    Layer_fine == 'L5B' ~ 2,
+    Layer_fine == 'L6' ~ 0)) %>%
+  ungroup()%>% filter(Layer_fine %in% c('L1','L2/3','L5A','L5B','L6')) %>% filter(between(rel_time,-1,1)) %>% group_by(Layer_fine, Behv,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3,col= Layer_fine))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='sienna2',linetype = 'dashed')+
+    facet_wrap(~Behv)+
+    theme_minimal()+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+```
+
+# Predictive coding
+```{r}
+PCdat <- Zeta %>% distinct(unit,Behv_combined2) %>%right_join(Trialless, by=join_by('unit' =='cluster_id2'))
+
+PCdat %>% filter(between(rel_time,-1,1)) %>%  filter(Behv != 'W2T') %>% na.omit() %>% group_by(Behv,rel_time,Behv_combined2) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3,col= Behv_combined2))+
+  geom_smooth(span=0.08)+
+  facet_grid(~Behv)
+
+PCdat %>% filter(between(rel_time,-1,1)) %>%   filter(Behv != 'W2T') %>% na.omit()  %>% mutate(Behv_combined2 = ifelse(Behv_combined2=='PC','PC','A2L')) %>% group_by(Behv,rel_time,Behv_combined2) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3,col= Behv_combined2))+
+  geom_smooth(span=0.08)+
+  geom_line()+
+  facet_grid(~Behv)
+
+PC_filter <- Zeta %>% filter(Behv_combined2=='PC') %>% pull(unit)
+Trialless %>% filter(cluster_id2 %in% PC_filter) %>%  filter(between(rel_time,-0.1,0.6)) %>% group_by(Behv,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+  geom_smooth(span=0.1)+
+  geom_vline(xintercept = 0, col ='sienna2',linetype = 'dashed')+
+  geom_vline(xintercept = 0.25, col ='sienna2',linetype = 'dashed')+
+  facet_wrap(~Behv)+
+  theme_minimal()
+```
+
+
+# whsiking
+```{r, include=FALSE}
+whisk <- Zeta %>% distinct(unit,Behv_combined) %>%right_join(Trialless, by=join_by('unit' =='cluster_id2'))
+
+whisk %>% filter(!str_detect(Behv_combined, 'Whisk')) %>% distinct(Behv_combined)
+
+whisk  %>% filter(str_detect(Behv_combined, 'Whisk'))  %>% filter(Behv=='W2T') %>% filter(between(rel_time,-1,1)) %>%  group_by(rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+  geom_smooth(span=0.08)+
+  geom_line()
+
+whisk  %>% filter(!str_detect(Behv_combined, 'Whisk'))  %>% filter(Behv=='W2T') %>% filter(between(rel_time,-1,1)) %>%  group_by(rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+  geom_smooth(span=0.08)+
+  geom_line()
+  
+  
+Trialless  %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time) %>% filter(Behv =='W2T') %>%  group_by(rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+  geom_smooth(span=0.08)
+    
+```
+
+# misc plots
+```{r}
+
+
+Trialless %>% separate_wider_delim(cluster_id2, delim ='_', names = c('del', 'Mouse','Day'), cols_remove = F) %>% unite('id', c(Mouse,Day)) %>% select(!del) %>% group_by(id) %>% summarise(n = n_distinct(cluster_id2)) %>% arrange(-n) %>% ggplot(aes(reorder(id,-n),n))+
+  geom_col()+
+  scale_x_discrete(guide = guide_axis(angle = 45))+
+  theme_minimal()+
+  ggtitle('neurons per session')
+
+
+
+
+```
+
+```{r}
+output_dir <- "E:/Florian/plottry" 
+
+
+plots <- unique(combcont$cluster_id2) %>% 
+    walk(~ {
+      # Filter data for the current cluster_id2
+      Datatemp <- combcont %>% filter(cluster_id2 == .x)
+      
+      # Create the density plot
+      map <- Datatemp %>% 
+        filter(event_count > 0, between(rel_time, -1, 1)) %>%
+        group_by(Behv) %>%
+        mutate(t2 = dense_rank(Trial)) %>% 
+        ggplot() +
+        geom_density(aes(rel_time), bw = 0.03) +
+        facet_wrap(~Behv, scales = 'free_y')+
+        theme_minimal()
+      
+      # Create the histogram plot
+      smo <- Datatemp %>% 
+        filter(event_count > 0, between(rel_time, -1, 1)) %>%
+        group_by(Behv) %>%
+        mutate(t2 = dense_rank(Trial)) %>% 
+        ggplot() +
+       geom_jitter(aes(rel_time,t2), height = 0.2,size=0.5) +
+        facet_wrap(~Behv, scales = 'free_y')+
+         theme_minimal()
+      
+      # Combine the two plots vertically with ggarrange
+      plot <- ggpubr::ggarrange(smo, map, heights = c(2, 0.8), vjust = c(0.5, 0.5),
+                                ncol = 1, nrow = 2, align = "v", common.legend = TRUE, legend = 'right')
+      
+      # Add a title with the cluster_id2
+      plot <- ggpubr::annotate_figure(plot, 
+                                      top = ggpubr::text_grob(paste("ID:", .x), 
+                                                              color = "red", face = "bold", size = 14))
+      
+      # Save the plot to the output directory with a filename based on cluster_id2 without displaying
+      suppressMessages(
+        ggsave(filename = paste0(output_dir, "/", .x, "_plot.png"), 
+              bg='white' )
+      )
+    })
+```
+
+
+```{r}
+
+
+
+
+avg <- plot_single_unit(combcont, '48_M2_1')
+avg2 <- plot_single_unit(combcont, '44_M2_1')
+inh <- plot_single_unit(combcont, '50_M6_3')
+
+mega <-  ggpubr::ggarrange(avg,avg2,inh,
+                            ncol = 1, nrow = 3, align = "h")
+
+mega
+
+
+
+```
+
+```{r}
+
+
+avg <- plot_single_unit_top(combcont, '48_M2_1')
+avg2 <- plot_single_unit_mid(combcont, '44_M2_1')
+inh <- plot_single_unit_bot(combcont, '48_M2_1')
+
+mega <-  ggpubr::ggarrange(avg,avg2,inh,
+                            ncol = 1, nrow = 3, heights = c(1.2,1,1.2),widths = c(1.2,1,1.2))
+
+mega
+
+
+avg <- plot_single_unit_mid(combcont, '48_M2_1')
+avg2 <- plot_single_unit_mid(combcont, '44_M2_1')
+inh <- plot_single_unit_mid(combcont, '48_M2_1')
+
+library(gtable)
+p1 <- ggplotGrob(avg)
+p2 <- ggplotGrob(avg2)
+p3 <- ggplotGrob(inh)
+
+library(gridExtra)
+library(grid)
+g <- rbind(p1,p2, p3, size = "first")
+g$widths <- unit.pmax(p1$widths,p2$widths, p3$widths)
+grid.newpage()
+grid.draw(g)
+
+library(egg)
+
+
+avg <- plot_single_unit_mid(combcont, '48_M2_1')+
+  geom_vline(xintercept = 0.18,col ='sienna2',linetype = 'dashed')+
+   geom_vline(xintercept = 0.52,col ='sienna2',linetype = 'dashed')+
+   geom_vline(xintercept = 0.85,col ='sienna2',linetype = 'dashed')
+
+avg2 <- plot_single_unit_mid(combcont, '57_M1_2')+
+  geom_vline(xintercept = 0.18,col ='sienna2',linetype = 'dashed')+
+   geom_vline(xintercept = 0.52,col ='sienna2',linetype = 'dashed')+
+   geom_vline(xintercept = 0.85,col ='sienna2',linetype = 'dashed')
+
+inh <- plot_single_unit_mid(combcont, '50_M6_3')+
+  geom_vline(xintercept = 0.18,col ='sienna2',linetype = 'dashed')+
+   geom_vline(xintercept = 0.52,col ='sienna2',linetype = 'dashed')+
+   geom_vline(xintercept = 0.85,col ='sienna2',linetype = 'dashed')
+
+
+fig <- ggpubr::ggarrange(avg,avg2,inh,nrow = 3)
+fig
+
+ggpubr::annotate_figure(fig, left = ggpubr::text_grob('Trial_number',rot=90))
+
+ggpubr::ggexport(fig,width = 1200/90,height = 880/90)
+
+getwd()
+
+inh <- plot_single_unit_bot(combcont, '48_M2_1')
+inh
+ggsave('ihn.tiff')
+
+
+pdf(fig)
+
+http://127.0.0.1:27785/graphics/plot_zoom_png?width=1200&height=880
+
+getwd()
+```
+
+
+```{r}
+ 
+ord <- Trialless  %>% filter(between(rel_time,0,0.1)) %>% group_by(cluster_id2)  %>%
+      filter(Behv == 'A2L') %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+ 
+  
+  
+g1 <- Trialless  %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time)
+  
+
+g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+  
+
+p1  <- g1 %>% filter(group!='noise')%>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_grid(group~Behv,scales = 'free')+
+    scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    labs(fill='Z- scored FR') 
+  
+  
+  #activity across all units
+ p2 <- g1 %>% filter(group!='noise') %>%  group_by(Behv,rel_time,group) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(group~Behv)+
+    theme_minimal()+
+   theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+    
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/waveformcomp.png", bg='white')
+  smo
+  
+  g1
+  # arrange plots
+  plot <- ggpubr::ggarrange(p1,p2, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+  ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/waveformcomp.png", bg='white')
+```
+
+```{r}
+contlick_w2T <- data.table::fread("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/contlick_W2T.csv")
+contlick <- contlick_w2T %>% left_join(contlick_w2T %>% group_by(id) %>% distinct(Trial) %>% summarise(n_trials = n()))
+Triallesslick <- contlick%>% group_by(rel_time, cluster_id2)  %>% 
+    mutate(rate = (sum(event_count)/n_trials), rate = rate/0.01) %>% ungroup() %>% 
+    distinct(rel_time, cluster_id2,rate,n_spikes,depth,group,fr,n_trials) %>% group_by(cluster_id2) %>% 
+    mutate(Zscore = (rate - mean(rate))/sd(rate))
+
+```
+
+```{r}
+Triallesslick <- Triallesslick %>% ungroup() %>% filter(cluster_id2 %in% Lick_filt)
+ord <- Triallesslick  %>% filter(between(rel_time,-1,1)) %>% group_by(cluster_id2)  %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+ 
+  
+
+  
+  # z score and filter
+  g1 <- Triallesslick  %>% filter(between(rel_time,-1,1)) %>% select(cluster_id2,Zscore,rel_time)
+  
+
+  
+  #apply order 
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+
+map <- g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red')+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    labs(fill='Z- scored FR') 
+  
+  
+  #activity across all units
+  smo <- g1 %>% group_by(rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  # arrange plots
+  plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+  
+  
+Triallesslick %>% distinct(cluster_id2)
+```
+
+
+
+```{r}
+ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/lickmaybe_W2T.png")
+  
+  contlick %>% filter(rel_time==-0.25) %>% distinct(Trialtype)
+  
+contlick %>% group_by(Trial2,Trialtype) %>% summarise(t1 = min(rel_time)) %>% filter(Trialtype =='Airpuff') %>% na.omit() %>% ggplot(aes(t1))+
+  geom_histogram()
+
+contlick %>% filter(Trial2 == 'M1_1_000')
+
+contlick %>% group_by(Trial2,Trialtype) %>% summarise(t1 = min(rel_time)) %>% filter(Trialtype %in% c('Airpuff', 'HIT')) %>% ungroup %>% distinct(Trialtype)
+
+g1
+```
+
+

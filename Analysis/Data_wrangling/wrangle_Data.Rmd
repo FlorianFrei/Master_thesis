@@ -9,28 +9,81 @@ source("E:/Florian/Github/Master_thesis/Analysis/Data_wrangling/wrangling_helper
 ```
 
 ```{r}
-Data <- load_data(datapath = "C:/Users/deepl/Desktop/batch3/zoom/data", metapath = "C:/Users/deepl/Desktop/batch3/zoom/meta")
+Data <- load_data(datapath = "E:/Florian/Aligned_Data/Neuropixles_analysable/Data", metapath = "E:/Florian/Aligned_Data/Neuropixles_analysable/meta")
 combcont <- Align_all(Data)
 Trialless <- avg_trials(combcont, bin_size = 0.01)
-```
 
-```{r}
-getwd()
+Data %>% write_csv("E:/Florian/Aligned_Data/Neuropixles_analysable/wrangled_Data/Data.csv")
+combcont %>% write_csv("E:/Florian/Aligned_Data/Neuropixles_analysable/wrangled_Data/combcont.csv")
+Trialless %>% write_csv("E:/Florian/Aligned_Data/Neuropixles_analysable/wrangled_Data/Trialless.csv")
 
-Data %>% write_csv("C:/Users/deepl/Desktop/batch3/zoom/wrangled_Data/Data.csv")
-combcont %>% write_csv("C:/Users/deepl/Desktop/batch3/zoom/wrangled_Data/combcont.csv")
-Trialless %>% write_csv("C:/Users/deepl/Desktop/batch3/zoom/wrangled_Data/Trialless.csv")
-
-
-```
-
-```{r}
-Data %>% filter(event_count > 0) %>% tidyr::separate_wider_delim(id, delim = '_', names = c('Mouse','Day')) %>%  select(Mouse,Day, cluster_id,time_bin,event_count,Trialtype,Behv,Trial)  %>% uncount(weights = event_count) %>% mutate( time_bin = time_bin  + runif(n(), min = 0.001, max = 0.002) ) %>% write_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zetadata.csv")
 ```
 
 
 ```{r}
-Trialless
+
+
+Data %>% write_csv("E:/Florian/Aligned_Data/Neuropixles_analysable/wrangled_Data/Data.csv")
+combcont %>% write_csv("E:/Florian/Aligned_Data/Neuropixles_analysable/wrangled_Data/combcont.csv")
+Trialless %>% write_csv("E:/Florian/Aligned_Data/Neuropixles_analysable/wrangled_Data/Trialless.csv")
+
+Data %>% filter(event_count > 0) %>% tidyr::separate_wider_delim(id, delim = '_', names = c('Mouse','Day')) %>%  select(Mouse,Day, cluster_id,time_bin,event_count,Trialtype,Behv,Trial)  %>% uncount(weights = event_count) %>% mutate( time_bin = time_bin  + runif(n(), min = 0.001, max = 0.002) ) %>% write_csv("E:/Florian/Aligned_Data/Neuropixles_analysable/wrangled_Data/Zetadata.csv")
+
 ```
+
+```{r}
+Data <- data.table::fread("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Data.csv")
+Data %>% filter(event_count > 0) %>% tidyr::separate_wider_delim(id, delim = '_', names = c('Mouse','Day')) %>%  select(Mouse,Day, cluster_id,time_bin,event_count,Trialtype,Behv,Trial)  %>% uncount(weights = event_count) %>% mutate( time_bin = time_bin  + runif(n(), min = 0.001, max = 0.002) ) %>% write_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetadata.csv")
+
+contlick <-Align_behv(Data = Data %>% filter(Behv =='A2L'),State = 'HIT') %>% mutate(State = 'Lick')
+contlick %>% write_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/contlick.csv") 
+
+
+Data <- data.table::fread("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Data.csv")
+Data %>% distinct(Trialtype)
+contlick_w2T <-Align_behv(Data = Data %>% filter(Behv =='W2T'),State = 'LeftReward') %>% mutate(State = 'Lick')
+contlick_w2T  %>% write_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/contlick_W2T.csv") 
+```
+
+
+```{r}
+Data <- read.csv("E:/Florian/Aligned_Data/All_sessions/wrangled_Data/Data.csv")
+
+contAir <-Align_behv(Data = Data %>% filter(Behv =='A2L'),State = 'Airpuff') %>% mutate(State = 'Airpuff')
+contAir %>% write_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/contAir.csv") 
+rm(contAir)
+
+contWT_Hits <- Align_behv(Data = Data %>% filter(Behv =='W2T' & succ =='Hit'),State = 'HIT') %>% mutate(State = 'Hit')
+contWT_Hits %>% write_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/contWT_Hits.csv")
+rm(contWT_Hits )
+
+contPC <- Align_behv(Data = Data %>% filter(Behv =='PC'),State = 'Airpuff2') %>% mutate(State = 'PC')
+contPC %>%  write_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/contPC.csv")
+rm(contWT_Hits )
+
+rm(Data)
+contAir <- read_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/contAir.csv")
+contWT_Hits <- read_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/contWT_Hits.csv")
+contPC <- read_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/contPC.csv")
+
+ 
+combcont <- rbind(contAir,contWT_Hits,contPC)
+combcont <- combcont %>% left_join(combcont %>% group_by(id,Behv) %>% distinct(Trial) %>% summarise(n_trials = n()))
+combco1nt %>% write_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/combcont.csv")
+
+
+
+Trialless <- avg_trials(combcont, bin_size = 0.01)
+Trialless %>% write_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Trialless.csv")
+
+combcont %>% distinct(Trialtype)
+
+
+
+combcont %>% select(Trialtype,n_spikes,depth,group,fr,succ,n_trials)
+
+combcont %>% group_by(Behv,rel_time, cluster_id2)
+```
+
 
 `

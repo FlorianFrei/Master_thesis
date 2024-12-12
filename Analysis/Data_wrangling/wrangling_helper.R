@@ -19,17 +19,17 @@ load_data <- function(datapath,metapath){
   list_of_meta <- list.files(path = metapath,
                              pattern = "\\.tsv$",
                              full.names = TRUE)
-  meta <- read_tsv(list_of_meta, id = 'id2') %>%  as_tibble()%>% select(id2,cluster_id,n_spikes,depth)
+  meta <- read_tsv(list_of_meta, id = 'id2') %>%  as_tibble()%>% select(id2,cluster_id,n_spikes,depth,group,fr)
   meta <- meta %>% mutate(id = str_extract(meta$id2, "M\\d+_\\d+"))
   
   Data <- Data %>% select(cluster_id:trial,id) %>% left_join(meta %>% select(!id2),by = join_by(id,cluster_id))
   # adds more data such as the behaviour,depth or Hit/miss based on which Trialtypes where present 
-  Data <- Data %>% mutate(Trial = sprintf('%03d',trial))
+  Data <- Data %>% mutate(Trial = sprintf('%03d',trial)) %>% filter(group!='noise')
   Data <- Data %>% unite('Trial2',c(id,Trial),remove=F) %>% group_by(Trial2) %>%  mutate(Behv = case_when(
     any(Trialtype %in% c('Audio', 'W2T_Audio')) ~ "W2T",
     any(Trialtype %in% c('Airpuff', 'A2L_Audio')) ~ "A2L",
     any(Trialtype %in% c('PC_Audio', 'Airpuff2')) ~ "PC", 
-    .default = "WTF")) %>% mutate(succ = ifelse('HIT' %in% Trialtype,'Hit','Miss')) %>% ungroup() %>%  unite('cluster_id2',c(cluster_id,id),remove=F) %>% mutate(depthcat = ifelse(depth < ((1000)*(2/3)),"L5",'L3'))
+    .default = "WTF")) %>% mutate(succ = ifelse('HIT' %in% Trialtype,'Hit','Miss')) %>% ungroup() %>%  unite('cluster_id2',c(cluster_id,id),remove=F) 
   Data
 }
 
@@ -49,9 +49,10 @@ Align_all <- function(Data){
 
 avg_trials <- function(Data,bin_size=0.01){
   Trialless <- combcont %>% group_by(Behv,rel_time, cluster_id2)  %>% 
-  mutate(rate = (sum(event_count)/n_trials), rate = rate/bin_size) %>% ungroup() %>% 
-  distinct(depthcat,Behv,rel_time,cluster_id2,rate,depth,n_spikes,id) %>% group_by(Behv,cluster_id2) %>% 
-  mutate(Zscore = (rate - mean(rate))/sd(rate))
+    mutate(rate = (sum(event_count)/n_trials), rate = rate/bin_size) %>% ungroup() %>% 
+    distinct(Behv,rel_time, cluster_id2,rate,n_spikes,depth,group,fr,n_trials) %>% group_by(Behv,cluster_id2) %>% 
+    mutate(Zscore = (rate - mean(rate))/sd(rate))
+  
 }
 
 

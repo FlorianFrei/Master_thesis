@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 #%%
 
-Data = pd.read_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zetadata.csv")
+Data = pd.read_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetadata.csv")
 
 #%% for single tries
 
@@ -39,10 +39,14 @@ W2T = ZetaMass(Data,'W2T','HIT',lag = 0.01, window = 0.3)
 A2L = ZetaMass(Data,'A2L','Airpuff',lag=0.01, window = 0.3)
 PC = ZetaMass(Data,'PC','Airpuff2',lag=0.01, window = 0.3)
 Whisk = ZetaMass(Data,'W2T','HIT',lag=0.3, window = 0.3)
+Lick_W2T = ZetaMass(Data,'W2T','LeftReward',lag=0, window = 0.2)
+Lick_A2L = ZetaMass(Data,'A2L','HIT',lag=0.05, window = 0.2)
 
 #%%
-basefolder = "C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests_4cat"
+basefolder = "E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests"
 W2T.to_csv(basefolder + str('/W2T.csv'))
 A2L.to_csv(basefolder + str('/A2L.csv'))
 PC.to_csv(basefolder + str('/PC.csv'))
 Whisk.to_csv(basefolder + str('/Whisk.csv'))
+Lick_W2T.to_csv(basefolder + str('/lickW2T.csv'))
+Lick_A2L.to_csv(basefolder + str('/lickA2L.csv'))

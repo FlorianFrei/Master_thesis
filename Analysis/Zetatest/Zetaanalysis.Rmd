@@ -6,12 +6,15 @@ date: "2024-09-25"
 # load Data
 ```{r}
 library(tidyverse)
-W2T <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests_4cat/W2T.csv") %>% mutate(Behv = 'W2T')
-A2L <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests_4cat/A2L.csv") %>% mutate(Behv = 'A2L')
-PC <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests_4cat/PC.csv") %>% mutate(Behv = 'PC')
-Whisk <- read.csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Zeta_Tests_4cat/HIT.csv") %>% mutate(Behv = 'Whisk')
+W2T <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/W2T.csv") %>% mutate(Behv = 'W2T_HIT')
+A2L <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/A2L.csv") %>% mutate(Behv = 'A2L')
+PC <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/PC.csv") %>% mutate(Behv = 'PC')
+Whisk <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/Whisk.csv") %>% mutate(Behv = 'Whisk')
+Lick_A2L <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/lickA2L.csv") %>% mutate(Behv = 'lick_A2L')
+Lick_W2T <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/lickW2T.csv") %>% mutate(Behv = 'lick_W2T')
 
-Data <- rbind(W2T,A2L,PC,Whisk) %>% unite('unit', c(unit, Mouse,Day))  %>% filter(p_val < 0.05/4) %>% select(-X,-p_val)
+
+Data <- rbind(W2T,A2L,PC,Whisk,Lick_A2L,Lick_W2T) %>% unite('unit', c(unit, Mouse,Day))  %>% filter(p_val < 0.05) %>% select(-X,-p_val)
 Data %>% group_by(unit) %>% summarise(Behv_combined = paste(unique(Behv), collapse = "_")) %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / sum(n))*100)
 Data %>% count(Behv)
 ```
@@ -54,7 +57,7 @@ ggplot(ov2, aes(x = Behv1, y = Behv2, fill = fraction)) +
        x = "Behavior 1",
        y = "Behavior 2",
        fill = "Fraction Shared") +
-  scale_fill_gradient(low = 'beige', high = 'red', limits = c(0.24,1), breaks = c(0.24,1) ,na.value = "black")+
+  scale_fill_gradient(low = 'beige', high = 'red', limits = c(0,1), breaks = c(0,1) ,na.value = "black")+
   theme_void() +
   xlab(element_blank())+
   ylab(element_blank())+
@@ -66,6 +69,13 @@ ggplot(ov2, aes(x = Behv1, y = Behv2, fill = fraction)) +
 #ggsave("C:/Users/deepl/Desktop/com_Data/figures/sharedunits2_regular.tiff")
 ```
 
+```{r}
+Unit_behv
+
+Lick_filt <- Data  %>% filter(Behv=='lick_A2L') %>% select(unit) %>% semi_join(Data %>% filter(Behv=='lick_W2T')%>% select(unit)) %>% pull(unit)
+
+(Data %>%  select(unit) %>% n_distinct() /100)*5
+```
 
 
 
