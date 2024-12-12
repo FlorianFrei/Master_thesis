@@ -75,52 +75,60 @@ def get_ITI_starts(TTL_states,TTL_sample_times, sample_nums,sample_freq):
     return ITI
 
 
-def BPOD_wrangle(raw_BPOD,ITI):
+def BPOD_wrangle(raw_BPOD,ITI,proceed):
     #takes raw MAtlab list of lists and transforms it into a Dataframe of all trials 
+    if proceed == True:
+        # start and end time in same time as OE data
+        start = raw_BPOD['SessionData']['TrialStartTimestamp'] +ITI[0] - raw_BPOD['SessionData']['TrialStartTimestamp'][0] 
+        end = raw_BPOD['SessionData']['TrialEndTimestamp'] + ITI[0] - raw_BPOD['SessionData']['TrialStartTimestamp'][0] 
     
-    # start and end time in same time as OE data
-    start = raw_BPOD['SessionData']['TrialStartTimestamp'] +ITI[0] - raw_BPOD['SessionData']['TrialStartTimestamp'][0] 
-    end = raw_BPOD['SessionData']['TrialEndTimestamp'] + ITI[0] - raw_BPOD['SessionData']['TrialStartTimestamp'][0] 
-
-    # calculates the time between Trial end and next trial start
-    dead_time=[]
-    i=0
-    for i in range(len(start) - 1):  # Iterate up to the second-to-last element
-        diff = start[i + 1] - end[i]  # Compute the difference between the start of the next trial and the end of the current trial
-        dead_time.append(diff)
-
-    # Append 0 for the last trial since there's no "dead time" after the last trial
-    dead_time.append(0)
-            
-    # list to Dataframe
-    llist=[]
-    i=0
-    for i in range(len(raw_BPOD['SessionData']['RawEvents']['Trial'])):
-        states = raw_BPOD['SessionData']['RawEvents']['Trial'][i]['States']
-        hgh = pd.DataFrame.from_dict(states).transpose()
-        hgh['type'] = hgh.index
-        hgh['Trial'] = i
-        hgh.loc[len(hgh.index)] = [hgh[1].max(),hgh[1].max() + dead_time[i],'dead_time',i]
-        llist.append(hgh)
-    BPOD = pd.concat(llist)
-    BPOD.dropna(inplace=True)
-    BPOD.reset_index(inplace=True,drop=True)
-
-
-    # adds continous time for later steps
-    cum =[]
-    i= 0
-    for i in range(len(BPOD)):
-        if i == 0:
-            cum.append(BPOD[1][i])
-        else:
-            temp = BPOD[1][i] - BPOD[0][i]
-            diff = temp + cum[i-1]
-            cum.append(diff) 
-    BPOD['Cont_time'] = cum+ ITI[0]
-    BPOD['state_len'] = BPOD[1] - BPOD[0]
-    BPOD['Cont_start'] = BPOD['Cont_time']-BPOD['state_len']
-    return BPOD
+        # calculates the time between Trial end and next trial start
+        dead_time=[]
+        i=0
+        for i in range(len(start) - 1):  # Iterate up to the second-to-last element
+            diff = start[i + 1] - end[i]  # Compute the difference between the start of the next trial and the end of the current trial
+            dead_time.append(diff)
+    
+        # Append 0 for the last trial since there's no "dead time" after the last trial
+        dead_time.append(0)
+                
+        # list to Dataframe
+        llist=[]
+        i=0
+        for i in range(len(raw_BPOD['SessionData']['RawEvents']['Trial'])):
+            states = raw_BPOD['SessionData']['RawEvents']['Trial'][i]['States']
+            hgh = pd.DataFrame.from_dict(states).transpose()
+            hgh['type'] = hgh.index
+            hgh['Trial'] = i
+            hgh.loc[len(hgh.index)] = [hgh[1].max(),hgh[1].max() + dead_time[i],'dead_time',i]
+            llist.append(hgh)
+        BPOD = pd.concat(llist)
+        BPOD.dropna(inplace=True)
+        BPOD.reset_index(inplace=True,drop=True)
+    
+    
+        # adds continous time for later steps
+        cum =[]
+        i= 0
+        for i in range(len(BPOD)):
+            if i == 0:
+                cum.append(BPOD[1][i])
+            else:
+                temp = BPOD[1][i] - BPOD[0][i]
+                diff = temp + cum[i-1]
+                cum.append(diff) 
+        BPOD['Cont_time'] = cum+ ITI[0]
+        BPOD['state_len'] = BPOD[1] - BPOD[0]
+        BPOD['Cont_start'] = BPOD['Cont_time']-BPOD['state_len']
+        tempp = []
+        for i in BPOD['Trial']:
+          tempvar = raw_BPOD['SessionData']['TrialTypes'][i]
+          tempp.append(tempvar)
+           
+        BPOD['Trialtype'] = tempp
+        return BPOD
+    else:
+        print("Stop, this is not gonaa work ")
 
 def adjust_BPOD_with_dead_time(BPOD, ITI):
     #makes sure that The BPOD ITI start is always aligned to the ITI TTL signal in OE
@@ -165,6 +173,34 @@ def adjust_BPOD_with_dead_time(BPOD, ITI):
                     BPOD.at[j, 'Cont_start'] += dead_time2
                     BPOD.at[j, 'Cont_time'] += dead_time2
                     BPOD.at[j, 'state_len'] = BPOD.at[j, 'Cont_time'] - BPOD.at[j, 'Cont_start']  # Update state_len
+        elif row['Cont_start'] > true_iti and BPOD.iloc[i - 1]['type'] == 'dead_time':
+                print(f"Warning: BPOD Cont_start ({row['Cont_start']}) is later than true ITI ({true_iti}).")
+
+                # Add a 'dead_time2' row with negative state_len
+                prev_row = BPOD.iloc[i - 1]
+                dead_time2 = row['Cont_start'] - true_iti
+                new_row = {
+                    'type': 'dead_time2',
+                    'Cont_start': true_iti,
+                    'Cont_time': row['Cont_start'],
+                    'Trial': prev_row['Trial'],
+                    0: prev_row[1],
+                    1: prev_row[1] - dead_time2,
+                    'state_len': -dead_time2
+                }
+                new_rows.append((i, new_row))
+
+                # Adjust the ITI row's Cont_start to align with true ITI
+                row_shift = row['Cont_start'] - true_iti
+                BPOD.at[i, 'Cont_start'] = true_iti
+                BPOD.at[i, 'Cont_time'] -= row_shift
+                BPOD.at[i, 'state_len'] = BPOD.at[i, 'Cont_time'] - BPOD.at[i, 'Cont_start']
+
+                # Update subsequent rows
+                for j in range(i + 1, len(BPOD)):
+                    BPOD.at[j, 'Cont_start'] -= row_shift
+                    BPOD.at[j, 'Cont_time'] -= row_shift
+                    BPOD.at[j, 'state_len'] = BPOD.at[j, 'Cont_time'] - BPOD.at[j, 'Cont_start']
     
     # Insert new 'dead_time2' rows into the BPOD dataframe
     shift = 0  # Track how much we are shifting the index as rows are inserted
@@ -172,6 +208,9 @@ def adjust_BPOD_with_dead_time(BPOD, ITI):
         idx += shift  # Adjust index by the shift since we're adding rows
         BPOD = pd.concat([BPOD.iloc[:idx], pd.DataFrame([new_row]), BPOD.iloc[idx:]]).reset_index(drop=True)
         shift += 1  # Increment shift since we inserted a row
+    print(f"Mean value of dead_time2: {BPOD[BPOD['type'] == 'dead_time2']['state_len'].mean()}")
+    print(f"Max value of dead_time2: {BPOD[BPOD['type'] == 'dead_time2']['state_len'].max()}")
+
     return BPOD
 
 
@@ -222,17 +261,20 @@ def Add_Behv(Ephys_binned,BPOD,raw_BPOD,ITI):
     j = 0
     trialtype = []
     trial = []
+    Behv = []
     
     while i < len(EPHYS_trimmed) and j < len(BPOD):
         if BPOD['Cont_start'][j] <= EPHYS_trimmed.iloc[i, 1] <= BPOD['Cont_time'][j]:
             trialtype.append(BPOD['type'][j])
             trial.append(BPOD['Trial'][j])
+            Behv.append(BPOD['Trialtype'][j])
             i += 1
         else:
             j += 1
             print(j)
     EPHYS_trimmed['Trialtype'] = trialtype 
     EPHYS_trimmed['trial'] = trial 
+    EPHYS_trimmed['Behv'] =Behv
     return(EPHYS_trimmed)
 
 def Add_trial(EPHYS_trimmed):
@@ -271,13 +313,32 @@ def Raw_to_df_all(cluster_group,clust,times,TTL_states,TTL_sample_times, sample_
 
 
 
+def check_trialnumber_matches(ITI,raw_BPOD):
+    proceed = False
+    print(f"ITI {len(ITI)}")
+    print(f"BPOD: {len(raw_BPOD['SessionData']['TrialStartTimestamp'])}")
+
+    if len(ITI) > len(raw_BPOD['SessionData']['TrialStartTimestamp']):
+        print('length does not match, more ITI than BPOD')
+        timediff = (ITI[1]-ITI[0]) - (raw_BPOD['SessionData']['TrialStartTimestamp'][1]-raw_BPOD['SessionData']['TrialStartTimestamp'][0])
+        print(f'First trial time differs by {timediff}')
+        if abs(timediff) < 0.01:
+            proceed = True
+        else:
+            timediff2 = (ITI[2]-ITI[1]) - (raw_BPOD['SessionData']['TrialStartTimestamp'][1]-raw_BPOD['SessionData']['TrialStartTimestamp'][0])
+            print(f'second trial time differs by {timediff2}')
+            if abs(timediff2) < 0.01:
+                print('take trial2')
+        
+    elif len(ITI) < len(raw_BPOD['SessionData']['TrialStartTimestamp']):
+        print('length does not match, more  BPOD than ITI')
+        print('what a fail')
+    else:
+        print('Lengths match.')
+        timediff = (ITI[1]-ITI[0]) - (raw_BPOD['SessionData']['TrialStartTimestamp'][1]-raw_BPOD['SessionData']['TrialStartTimestamp'][0])
+        print(f'First trial time differs by {timediff}')
+        proceed = True
+    return proceed
 
 
-
-
-
-
-
-
-
-
+    
