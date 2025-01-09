@@ -6,17 +6,22 @@ date: "2024-09-25"
 # load Data
 ```{r}
 library(tidyverse)
+source("E:/Florian/Github/Master_thesis/Analysis/Analysis/Master_helper.R")
 W2T <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/W2T.csv") %>% mutate(Behv = 'W2T_HIT')
 A2L <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/A2L.csv") %>% mutate(Behv = 'A2L')
 PC <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/PC.csv") %>% mutate(Behv = 'PC')
 Whisk <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/Whisk.csv") %>% mutate(Behv = 'Whisk')
-Lick_A2L <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/lickA2L.csv") %>% mutate(Behv = 'lick_A2L')
-Lick_W2T <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/lickW2T.csv") %>% mutate(Behv = 'lick_W2T')
+Trialless <- read_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Trialless.csv")
+
+# Lick_A2L <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/lickA2L.csv") %>% mutate(Behv = 'lick_A2L')
+# Lick_W2T <- read.csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/lickW2T.csv") %>% mutate(Behv = 'lick_W2T')
 
 
-Data <- rbind(W2T,A2L,PC,Whisk,Lick_A2L,Lick_W2T) %>% unite('unit', c(unit, Mouse,Day))  %>% filter(p_val < 0.05) %>% select(-X,-p_val)
-Data %>% group_by(unit) %>% summarise(Behv_combined = paste(unique(Behv), collapse = "_")) %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / sum(n))*100)
-Data %>% count(Behv)
+
+Data <- rbind(W2T,A2L,PC,Whisk) %>% unite('unit', c(unit, Mouse,Day))  %>% filter(p_val < 0.05) %>% select(-X,-p_val)
+
+
+
 ```
 #wrangle and save
 ```{r}
@@ -25,13 +30,13 @@ Unit_behv <- Data %>%
   group_by(unit) %>%                          # Group by unit
   summarise(Behv_combined = paste(unique(Behv), collapse = "_"))
 
-no_W2T  <- Data %>% filter(Behv != c('W2T','Whisk')) %>% 
+no_W2T  <- Data %>% filter(!Behv %in% c('W2T_HIT','Whisk')) %>% 
   group_by(unit) %>%                          # Group by unit
   summarise(Behv_combined2 = paste(unique(Behv), collapse = "_"))
 
 Unit_Behv <- Data %>% left_join(Unit_behv) %>% distinct(unit,Behv_combined) %>% left_join(no_W2T)
 
-Unit_Behv %>% write_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Unit_Behv.csv")
+Unit_Behv %>% write_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/unit_behv.csv")
 ```
 
 #plots
@@ -51,31 +56,127 @@ ov2 <-overlap_matrix %>% rownames_to_column('Behv1') %>%
 
 ggplot(ov2, aes(x = Behv1, y = Behv2, fill = fraction)) +
   geom_tile()+
-  theme_minimal()+
    geom_text(aes(label = sprintf("%.2f", fraction)), size = 4, color = "black") +  # Add numbers inside tiles
   labs(title = "Fraction of Shared Units Between Behaviors",
-       x = "Behavior 1",
-       y = "Behavior 2",
        fill = "Fraction Shared") +
   scale_fill_gradient(low = 'beige', high = 'red', limits = c(0,1), breaks = c(0,1) ,na.value = "black")+
   theme_void() +
-  xlab(element_blank())+
-  ylab(element_blank())+
+  xlab('Total Units')+
+  ylab('Fraction Shared')+
   ggtitle('Fraction of shared units')+
   theme( strip.background = element_blank(),
          axis.text=element_text(size=12),
-          axis.title=element_text(size=20,face="bold"))+
-  theme(plot.title = element_text(hjust=0.5,size=20))
+          axis.title=element_text(size=14,face="bold"),
+         plot.title = element_text(hjust=0.5,size=20),
+         axis.title.y = element_text(angle = 90) )
 #ggsave("C:/Users/deepl/Desktop/com_Data/figures/sharedunits2_regular.tiff")
 ```
 
 ```{r}
-Unit_behv
 
-Lick_filt <- Data  %>% filter(Behv=='lick_A2L') %>% select(unit) %>% semi_join(Data %>% filter(Behv=='lick_W2T')%>% select(unit)) %>% pull(unit)
-
-(Data %>%  select(unit) %>% n_distinct() /100)*5
+#Lick_filt <- Data  %>% filter(Behv=='lick_A2L') %>% select(unit) %>% semi_join(Data %>% filter(Behv=='lick_W2T')%>% select(unit)) %>% pull(unit)
 ```
 
+
+# Stats und plots
+```{r}
+Data %>% group_by(unit) %>% summarise(Behv_combined = paste(unique(Behv), collapse = "_")) %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / Trialless %>% summarise(nmax = n_distinct(cluster_id2)) %>% pull(nmax))*100)
+
+Data %>% group_by(unit) %>% summarise(Behv_combined = paste(unique(Behv), collapse = "_")) %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / Trialless %>% summarise(nmax = n_distinct(cluster_id2)) %>% pull(nmax))*100)
+
+
+polar <- Data %>% group_by(Behv) %>% count() %>% mutate(nmax = Trialless %>% summarise(nmaxx = n_distinct(cluster_id2)) %>% pull(nmaxx),perc = (n /nmax*100), No = nmax-n, Yes = n) %>% pivot_longer(cols = c(Yes,No),names_to = 'Response', values_to = 'val')
+
+ggplot(polar, aes(x="", y=val, fill=Response)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  facet_wrap(~Behv)+
+  theme_void()
+
+Data %>% group_by(unit) %>% summarise(Behv_combined = paste(unique(Behv), collapse = "_")) %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / Trialless %>% summarise(nmax = n_distinct(cluster_id2)) %>% pull(nmax))*100) %>% ggplot(aes(x="", y=n, fill=Behv_combined)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void()
+
+library(waffle)
+Data %>% group_by(unit) %>% summarise(Behv_combined = paste(unique(Behv), collapse = "_")) %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / Trialless %>% summarise(nmax = n_distinct(cluster_id2)) %>% pull(nmax))*100) %>% ggplot(aes(values=n, fill=Behv_combined)) +
+ geom_waffle()+
+  theme_void()
+
+Data %>% group_by(unit) %>% summarise(Behv_combined = paste(unique(Behv), collapse = "_")) %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / Trialless %>% summarise(nmax = n_distinct(cluster_id2)) %>% pull(nmax))*100) %>% ggplot(aes(values=perc, fill=Behv_combined)) +
+ geom_waffle()+
+  theme_void()
+
+```
+
+#activitz of Zeta responsive and unresponisve units
+```{r}
+
+
+join <- Unit_Behv %>% left_join(Data %>% mutate(val = 1) %>%  pivot_wider(names_from = Behv,values_from = val) %>% replace_na(list(W2T_HIT=0, A2L=0, PC=0, Whisk=0)))
+
+Trialless2 <- add_layers(Trialless,depthpath = "E:/Florian/Aligned_Data/Analysable_data/depths")  %>% left_join(join, join_by('cluster_id2' == 'unit'))  %>% replace_na(list(W2T_HIT=0, A2L=0, PC=0, Whisk=0))
+
+Zetatrial <- Trialless2 %>% mutate(responsive = case_when(
+ Behv =='W2T' & W2T_HIT ==1 ~ 1,
+ Behv =='W2T' & Whisk ==1 ~ 1,
+ Behv =='A2L' & A2L ==1 ~ 1,
+ Behv =='PC' & PC ==1 ~ 1,
+ .default = 0)) %>%
+  group_by(Behv, responsive) %>%
+  mutate(cluster_id_new = dense_rank(cluster_id2)) %>% # Consistent numbering within each group
+  ungroup()
+
+
+
+ord <- Zetatrial  %>% filter(between(rel_time,0,0.1)) %>% group_by(cluster_id2)  %>%
+      filter(Behv == 'A2L') %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  
+g1 <- Zetatrial  %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,cluster_id_new,Zscore,rel_time,responsive)
+  
+
+g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+g1_combined <- g1 %>%
+  mutate(responsive = as.character(responsive)) %>% # Convert to character for flexibility
+  bind_rows(
+    g1 %>%
+      mutate(responsive = '2') # Add combined category
+  ) %>%
+  mutate(responsive = factor(responsive, levels = c('0', '1', '2'))) # Ensure correct ordering
+
+  
+g1_combined %>% group_by(Behv,rel_time,responsive) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(responsive~Behv)+
+    theme_minimal()+
+   theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+    
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+#ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/waveformcomp.png", bg='white')
+
+
+```
+# Zeta modulated per Layer
+```{r}
+
+
+Zetatrial %>% filter(Layer %in% c('L2/3', 'L5')) %>% distinct(Behv,Layer,cluster_id2,responsive,id) %>% group_by(id,Behv,Layer,responsive) %>% summarise(n =n() )  %>% group_by(id,Behv,Layer) %>% mutate(ntot = sum(n)) %>% filter(responsive==1) %>% mutate(perc = (n/ntot)*100) %>% ggplot(aes(Layer,perc))+
+  geom_boxplot()+
+  facet_wrap(~Behv)
+
+
+Zetatrial %>% filter(Layer %in% c('L2/3', 'L5')) %>% distinct(Behv,Layer,cluster_id2,responsive) %>% group_by(Behv,Layer,responsive) %>% summarise(n =n() )  %>% group_by(Behv,Layer) %>% mutate(ntot = sum(n))  %>% mutate(perc = (n/ntot)*100) %>% ggplot(aes(Layer,n,fill = as.factor(responsive)))+
+  geom_col(position="fill")+
+  facet_wrap(~Behv)
+```
 
 

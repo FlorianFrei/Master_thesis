@@ -4,12 +4,18 @@ Created on Mon Aug  5 15:15:16 2024
 
 @author: FlorianFreitag
 """
+import os
+
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+os.chdir(dname)
 
 import numpy as np
 import pandas as pd
 from helpers import*
-basefolder ="E:/Florian/Data/Opto_1/MLa45_1"
-mat_name = 'MLA45_OptoAir_20241120_185710'
+basefolder ="E:/Florian/Data/Opto_1/O2_1"
+mat_name = next(file for file in os.listdir(basefolder) if file.endswith('.mat'))
+
 #%% load data
 
 
@@ -24,11 +30,17 @@ sample_freq = 30000
 
 #%% format ITI
 
-ITI = ITI.iloc[:,0]
 
+ITI = ITI.iloc[:,0]
+#%%
+raw_BPOD = is_M9_1(raw_BPOD,mat_name)
+
+#%%
+#ITI =ITI[1:].reset_index(drop=True)
+proceed = check_trialnumber_matches(ITI, raw_BPOD)
 
 #%% wrangle BPOD
-BPOD = BPOD_wrangle(raw_BPOD,ITI)
+BPOD = BPOD_wrangle(raw_BPOD,ITI,proceed)
 
 #%%
 BPOD = adjust_BPOD_with_dead_time(BPOD, ITI)
@@ -43,10 +55,12 @@ Ephys_binned = bin_Ephys(Ephys_good,bin_size=0.01)
 EPHYS_trimmed = Add_Behv(Ephys_binned, BPOD, raw_BPOD, ITI)
 
 
-#%% re-add trials
-#EPHYS_trimmed2 = Add_trial(EPHYS_trimmed)
-
 #%% to csv
 
-EPHYS_trimmed.to_csv(basefolder + str('/M7_3.csv'))
+EPHYS_trimmed.to_csv(basefolder + str('/O2_1.csv'))
 
+
+#%%
+
+ITIdiff = [ITI[i + 1] - ITI[i] for i in range(len(ITI) - 1)]
+Bpoddiff = [raw_BPOD['SessionData']['TrialStartTimestamp'][i + 1] - raw_BPOD['SessionData']['TrialStartTimestamp'][i] for i in range(len(raw_BPOD['SessionData']['TrialStartTimestamp']) - 1)]

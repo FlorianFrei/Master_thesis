@@ -33,6 +33,31 @@ load_data <- function(datapath,metapath){
   Data
 }
 
+load_opto <- function(datapath,metapath){
+  
+  # loads individual data (from raw_ks_to_df) and meta data (from phy output) and combines them into a df
+  # takes names from filename. need to be M[Mouse_id]_[recording session] e.g. M1_2
+  list_of_data <- list.files(path = datapath,
+                             pattern = "\\.csv$",
+                             full.names = TRUE)
+  Data <- read_csv(list_of_data, id = 'group') 
+  Data <- Data %>% mutate(id = str_extract(Data$group, "O\\d+_[A-Za-z0-9]"))
+  
+  list_of_meta <- list.files(path = metapath,
+                             pattern = "\\.tsv$",
+                             full.names = TRUE)
+  meta <- read_tsv(list_of_meta, id = 'id2') %>%  as_tibble()%>% select(id2,cluster_id,n_spikes,depth,group,fr)
+  meta <- meta %>% mutate(id = str_extract(meta$id2, "O\\d+_[A-Za-z0-9]"))
+  
+  Data
+  
+  Data <- Data %>% select(cluster_id:id) %>% left_join(meta %>% select(!id2),by = join_by(id,cluster_id))
+  # adds more data such as the behaviour,depth or Hit/miss based on which Trialtypes where present 
+  Data <- Data %>% mutate(Trial = sprintf('%03d',trial)) %>% filter(group!='noise')
+  Data <- Data %>% unite('Trial2',c(id,Trial),remove=F) %>% group_by(Trial2) %>% mutate(succ = ifelse('HIT' %in% Trialtype,'Hit','Miss')) %>% ungroup() %>%  unite('cluster_id2',c(cluster_id,id),remove=F) 
+  Data
+}
+
 Align_all <- function(Data){
 
   contAir <-Align_behv(Data = Data %>% filter(Behv =='A2L'),State = 'Airpuff') %>% mutate(State = 'Airpuff')
@@ -50,11 +75,10 @@ Align_all <- function(Data){
 avg_trials <- function(Data,bin_size=0.01){
   Trialless <- combcont %>% group_by(Behv,rel_time, cluster_id2)  %>% 
     mutate(rate = (sum(event_count)/n_trials), rate = rate/bin_size) %>% ungroup() %>% 
-    distinct(Behv,rel_time, cluster_id2,rate,n_spikes,depth,group,fr,n_trials) %>% group_by(Behv,cluster_id2) %>% 
+    distinct(Behv,rel_time, cluster_id2,id,rate,n_spikes,depth,group,fr,n_trials) %>% group_by(Behv,cluster_id2) %>% 
     mutate(Zscore = (rate - mean(rate))/sd(rate))
   
 }
-
 
 
   

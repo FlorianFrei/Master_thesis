@@ -209,7 +209,12 @@ def adjust_BPOD_with_dead_time(BPOD, ITI):
         BPOD = pd.concat([BPOD.iloc[:idx], pd.DataFrame([new_row]), BPOD.iloc[idx:]]).reset_index(drop=True)
         shift += 1  # Increment shift since we inserted a row
     print(f"Mean value of dead_time2: {BPOD[BPOD['type'] == 'dead_time2']['state_len'].mean()}")
-    print(f"Max value of dead_time2: {BPOD[BPOD['type'] == 'dead_time2']['state_len'].max()}")
+    print(f"Max absolute value of dead_time2: {BPOD[BPOD['type'] == 'dead_time2']['state_len'].abs().max()}")
+    filtered_data = BPOD[BPOD['type'] == 'dead_time2']['state_len'].abs()
+    max_excluded = filtered_data.nlargest(2).iloc[-1]  # Get the second largest value
+    print(f"Max absolute value of dead_time2 (excluding the highest): {max_excluded}")
+
+
 
     return BPOD
 
@@ -340,5 +345,29 @@ def check_trialnumber_matches(ITI,raw_BPOD):
         proceed = True
     return proceed
 
-
+def is_M9_1(raw_BPOD, mat_name):
+   """
+    Modify raw_BPOD for the specific .mat file and reset indexes if conditions are met.
     
+    Parameters:
+    - raw_BPOD: dict, the BPOD data structure.
+    - mat_name: str, the name of the .mat file being processed.
+    
+    Returns:
+    - dict, the modified raw_BPOD if conditions are met; otherwise, the original raw_BPOD.
+    """
+   if mat_name == 'maybeM9_MA_20240919_180430.mat':
+        # Slice the lists
+        raw_BPOD['SessionData']['RawEvents']['Trial'] = raw_BPOD['SessionData']['RawEvents']['Trial'][29:]
+        raw_BPOD['SessionData']['TrialStartTimestamp'] = raw_BPOD['SessionData']['TrialStartTimestamp'][29:]
+        raw_BPOD['SessionData']['TrialEndTimestamp'] = raw_BPOD['SessionData']['TrialEndTimestamp'][29:]
+        
+        # Reset indexes (reinitialize the lists)
+        raw_BPOD['SessionData']['RawEvents']['Trial'] = list(raw_BPOD['SessionData']['RawEvents']['Trial'])
+        raw_BPOD['SessionData']['TrialStartTimestamp'] = list(raw_BPOD['SessionData']['TrialStartTimestamp'])
+        raw_BPOD['SessionData']['TrialEndTimestamp'] = list(raw_BPOD['SessionData']['TrialEndTimestamp'])
+        
+        return raw_BPOD
+   else:
+       return raw_BPOD
+

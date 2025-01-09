@@ -153,7 +153,7 @@ add_layers <- function(Data, depthpath){
   
   Layerd <- Data %>% separate_wider_delim(cluster_id2, delim ='_', names = c('del', 'Mouse','Day'), cols_remove = F) %>% unite('id', c(Mouse,Day)) %>%
     select(!del) %>% 
-    left_join(depth) %>% replace_na(list(surface = 1100)) %>% 
+    left_join(depth) %>% replace_na(list(surface = 950)) %>% 
     mutate(dist_surf = surface - depth) %>% 
     mutate(Layer_fine = case_when(
       between(dist_surf,-500,-20) ~ 'out',

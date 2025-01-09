@@ -22,23 +22,24 @@ source("E:/Florian/Github/Master_thesis/Analysis/Analysis/Master_helper.R")
 ```{r}
 Data <- data.table::fread("E:/Florian/Aligned_Data/All_sessions/wrangled_data/Data.csv", showProgress = T)
 combcont <- read.csv("E:/Florian/Aligned_Data/All_sessions/wrangled_data/combcont.csv")
-Trialless <- read_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Trialless.csv")
+Trialless <- read_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Trialless.csv")
+
 #Zeta <- read_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Unit_Behv.csv")
 ```
 
 # overview plots
 ```{r}
 Plot_overview(Trialless ,orderby_Behv = 'A2L',by_time = F, theme_smo = theme_minimal())
-#ggsave('C:/Users/deepl/Desktop/com_Data/figures/overview_7_12_bigtext.tiff',bg='white',width = 12,height = 7)
+ggsave('E:/Florian/Aligned_Data/Analysable_data/figures/overview_7_12_bigtext.tiff',bg='white',width = 12,height = 7)
 Plot_overview(Trialless,orderby_Behv = 'A2L',by_time = T, theme_smo = theme_minimal())
-#ggsave('C:/Users/deepl/Desktop/com_Data/figures/overview_byTime.tiff',bg='white')
+ggsave('E:/Florian/Aligned_Data/Analysable_data/figures//overview_byTime.tiff',bg='white')
 
 
 
 
-plot_overview_perID(Trialless, save="E:/Florian/Aligned_Data/All_sessions/wrangled_Data/overviewplots")
+plot_overview_perID(Trialless,orderby_Behv = 'A2L' , save='E:/Florian/Aligned_Data/Analysable_data/figures/sessions')
 
-Data %>% filter(group=='good') %>% group_by(id) %>% distinct(cluster_id2,id) %>% count(id)
+
 ```
 
 # Layer plots
@@ -47,8 +48,6 @@ Data %>% filter(group=='good') %>% group_by(id) %>% distinct(cluster_id2,id) %>%
 
 Layerd <- add_layers(Trialless,depthpath = "E:/Florian/Aligned_Data/Analysable_data/depths")
 
-Layerd %>% ggplot(aes(dist_surf,fill=Layer_fine))+
-  geom_histogram(binwidth=20)
 
 
 Layerd %>% filter(Layer %in% c('L2/3','L5')) %>% filter(between(rel_time,-1,1)) %>% group_by(Layer, Behv,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
@@ -59,6 +58,8 @@ Layerd %>% filter(Layer %in% c('L2/3','L5')) %>% filter(between(rel_time,-1,1)) 
     theme_minimal()+
     xlab("time from stimulus")+
     ylab("Z-scored FR")
+ggsave('E:/Florian/Aligned_Data/Analysable_data/figures/Layers.tiff',bg='white')
+
 
 Layerd %>% filter(Layer_fine %in% c('L1','L2/3','L5A','L5B','L6')) %>% filter(between(rel_time,-1,1)) %>% group_by(Layer_fine, Behv,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
     geom_line()+
@@ -68,6 +69,7 @@ Layerd %>% filter(Layer_fine %in% c('L1','L2/3','L5A','L5B','L6')) %>% filter(be
     theme_minimal()+
     xlab("time from stimulus")+
     ylab("Z-scored FR")
+ggsave('E:/Florian/Aligned_Data/Analysable_data/figures/Layers_fine.tiff',bg='white')
 
 Layerd  %>%
   mutate(Zscore =  Zscore + case_when(
@@ -84,9 +86,63 @@ Layerd  %>%
     theme_minimal()+
     xlab("time from stimulus")+
     ylab("Z-scored FR")
+  ggsave('E:/Florian/Aligned_Data/Analysable_data/figures/Layers_fine_butdifferent.tiff',bg='white')
+
+
+
+labels = Layerd %>% distinct(cluster_id2, Layer_fine, dist_surf) %>% filter(Layer_fine != 'WTF') %>% group_by(Layer_fine) %>% summarise(n=n(), 
+  x=  (min(dist_surf) + max(dist_surf))/2) %>%
+  mutate(y = 5)
+Layerd %>% distinct(cluster_id2, Layer_fine, dist_surf) %>% filter(Layer_fine != 'WTF')  %>%   ggplot()+
+  geom_histogram(aes(dist_surf,fill=Layer_fine),binwidth=20)+
+  geom_text(data= labels,aes(x,y, label=n))
+
+ggsave('E:/Florian/Aligned_Data/Analysable_data/figures/what_are_layers.tiff',bg='white')
+
 ```
 
-# Predictive coding
+# Predictive coding - amplitude and latency to peak differences
+```{r}
+Trialless2 <- Trialless %>%  filter(Behv %in% c('A2L', 'PC')) 
+Trialless2 <- add_layers(Trialless,depthpath = "E:/Florian/Aligned_Data/Analysable_data/depths")
+
+
+g2 <- Trialless %>%  filter(Behv %in% c('A2L', 'PC')) %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time,rate) %>% group_by(rel_time,Behv) %>% summarise( rate3 = mean(rate), sd = sd(rate), se = sd/sqrt(n())) %>% ungroup()
+g2 %>% slice_max(rate3)
+g2 %>%  ggplot(aes(rel_time,rate3,col= Behv))+
+    geom_line()+
+  geom_vline(xintercept = g2 %>% slice_max(rate3) %>% pull(rel_time))
+
+
+stat <- Trialless2 %>% mutate(rel_time = rel_time*1000) %>% filter(between(rel_time,0,50)) %>%  filter(Behv %in% c('A2L', 'PC')) %>% group_by(cluster_id2,Behv) %>% slice_max(abs(Zscore))  %>% filter(Layer %in% c('L5','L2/3')) 
+
+stat %>% ggplot(aes(rel_time,fill=Behv))+
+  geom_histogram(binwidth = 10)
+stat %>% ggplot(aes(Zscore,fill=Behv))+
+  geom_histogram(binwidth = 0.1)
+
+stat %>% ggplot(aes(y=rel_time,x=Behv))+
+  geom_violin()
+stat %>% ggplot(aes(y=Zscore,x=Behv))+
+  geom_violin()
+
+pairs(emmeans::emmeans(lm(data=stat, rel_time~Behv),'Behv'),adjust ='Tukey')
+plot(emmeans::emmeans(lm(data=stat, rel_time~Behv),'Behv'),comparisons = T)
+pairs(emmeans::emmeans(lm(data=stat, Zscore~Behv),'Behv'),adjust ='Tukey')
+plot(emmeans::emmeans(lm(data=stat, Zscore~Behv),'Behv'),comparisons = T)
+
+
+
+t.test(data=stat, rel_time~Behv)
+t.test(data=stat, Zscore~Behv)
+
+wilcox.test(stat$rel_time~stat$Behv)
+wilcox.test(data=stat, Zscore~Behv)
+
+
+
+```
+
 ```{r}
 PCdat <- Zeta %>% distinct(unit,Behv_combined2) %>%right_join(Trialless, by=join_by('unit' =='cluster_id2'))
 
@@ -408,6 +464,67 @@ contlick %>% filter(Trial2 == 'M1_1_000')
 contlick %>% group_by(Trial2,Trialtype) %>% summarise(t1 = min(rel_time)) %>% filter(Trialtype %in% c('Airpuff', 'HIT')) %>% ungroup %>% distinct(Trialtype)
 
 g1
+```
+```{r}
+
+  
+    ord <- Trialless  %>% filter(between(rel_time,0,0.1)) %>% group_by(cluster_id2)  %>%
+      filter(Behv == '1') %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  
+
+  
+  
+  
+  
+  
+  # z score and filter
+  g1 <- Trialless  %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time,phase)
+  
+
+  
+  #apply order 
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+  
+  #heatmap
+  map <-g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_wrap(~Behv,scales = 'free')+
+    scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    labs(fill='Z- scored FR') 
+  
+  
+  #activity across all units
+  smo <- g1 %>% filter(phase =='Thalamus') %>% group_by(Behv,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_wrap(~Behv)+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")+
+    xlim(-0.1,0.1)
+
+  # arrange plots
+  plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+  
+Trialless %>% distinct(phase)
+Plot_overview(Trialless %>% filter(phase =='cortex') ,orderby_Behv = '1',by_time = F, theme_smo = theme_minimal())
+  ggsave('cortex.png', bg='white')
+Plot_overview(Trialless %>% filter(phase =='Thalamus'),orderby_Behv = '1',by_time = F, theme_smo = theme_minimal())
+  ggsave('thalamus.png', bg='white')
 ```
 
 
