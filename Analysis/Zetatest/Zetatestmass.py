@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 #%%
 
-Data = pd.read_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetadata.csv")
+Data = pd.read_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Zetadata.csv")
 
 #%% for single tries
 
@@ -39,8 +39,8 @@ W2T = ZetaMass(Data,'W2T','HIT',lag = 0.01, window = 0.3)
 A2L = ZetaMass(Data,'A2L','Airpuff',lag=0.01, window = 0.3)
 PC = ZetaMass(Data,'PC','Airpuff2',lag=0.01, window = 0.3)
 Whisk = ZetaMass(Data,'W2T','HIT',lag=0.3, window = 0.3)
-Lick_W2T = ZetaMass(Data,'W2T','LeftReward',lag=0, window = 0.2)
-Lick_A2L = ZetaMass(Data,'A2L','HIT',lag=0.05, window = 0.2)
+Lick_W2T = ZetaMass(Data,'W2T','LeftReward',lag=0, window = 0.3)
+Lick_A2L = ZetaMass(Data,'A2L','HIT',lag=0.05, window = 0.3)
 
 #%%
 basefolder = "E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests"
