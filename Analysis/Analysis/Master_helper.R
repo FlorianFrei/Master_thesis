@@ -336,3 +336,52 @@ plot_single_unit_bot<- function(Combcont,cluster_id,smoothness = 0.03){
   
   plot
 }
+
+Plot_all_units <- function(Data, output_dir ){
+  plots <- unique(combcont$cluster_id2) %>%
+  walk(~ {
+    # Filter data for the current cluster_id2
+    Datatemp <- combcont %>% filter(cluster_id2 == .x)
+
+    # Create the density plot
+    map <- Datatemp %>%
+      filter(event_count > 0, between(rel_time, -1, 1)) %>%
+      group_by(Behv) %>%
+      mutate(t2 = dense_rank(Trial)) %>%
+      ggplot() +
+      geom_density(aes(rel_time), bw = 0.03) +
+      facet_wrap(~Behv, scales = "free_y") +
+      theme_minimal()
+
+    # Create the histogram plot
+    smo <- Datatemp %>%
+      filter(event_count > 0, between(rel_time, -1, 1)) %>%
+      group_by(Behv) %>%
+      mutate(t2 = dense_rank(Trial)) %>%
+      ggplot() +
+      geom_jitter(aes(rel_time, t2), height = 0.2, size = 0.5) +
+      facet_wrap(~Behv, scales = "free_y") +
+      theme_minimal()
+
+    # Combine the two plots vertically with ggarrange
+    plot <- ggpubr::ggarrange(smo, map,
+      heights = c(2, 0.8), vjust = c(0.5, 0.5),
+      ncol = 1, nrow = 2, align = "v", common.legend = TRUE, legend = "right"
+    )
+
+    # Add a title with the cluster_id2
+    plot <- ggpubr::annotate_figure(plot,
+      top = ggpubr::text_grob(paste("ID:", .x),
+        color = "red", face = "bold", size = 14
+      )
+    )
+
+    # Save the plot to the output directory with a filename based on cluster_id2 without displaying
+    suppressMessages(
+      ggsave(
+        filename = paste0(output_dir, "/", .x, "_plot.png"),
+        bg = "white"
+      )
+    )
+  })
+}

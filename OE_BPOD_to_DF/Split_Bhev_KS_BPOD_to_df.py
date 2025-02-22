@@ -7,10 +7,10 @@ Created on Wed Dec 11 16:33:52 2024
 
 import numpy as np
 import pandas as pd
-from helpers2 import*
-basefolder ="E:/Florian/Data/Opto_1/O2_T"
-mat_name1 = 'MLA46_OptoAir_20241121_155023'
-mat_name2 = 'MLA46_OptoAir_20241121_155900'
+from helpers import*
+basefolder ="D:/Florian_paper/Florian/Data/Opto_2/M5686_3_g0"
+mat_name1 = 'MLA5686_OptoAir_20241219_130645'
+mat_name2 = 'MLA5686_OptoAir_20241219_131846'
 #%% load data
 
 
@@ -38,7 +38,7 @@ ITI2 = ITI[max_diff_index + 1:].reset_index(drop=True) # After the max differenc
 
 
 #%%
-ITI1 = ITI1[1:].reset_index(drop=True) 
+#ITI1 = ITI1[1:].reset_index(drop=True) 
 
 proceed1 = check_trialnumber_matches(ITI1, raw_BPOD1)
 proceed2 = check_trialnumber_matches(ITI2, raw_BPOD2)
@@ -69,4 +69,4 @@ EPHYS_trimmed2['phase'] = 'Thalamus'
 EPhys_combined =  pd.concat([EPHYS_trimmed1, EPHYS_trimmed2],ignore_index=True)
 
 #%%
-EPhys_combined.to_csv(basefolder + str('/O1_T.csv'))
+EPhys_combined.to_csv(basefolder + str('/O5_T.csv'))

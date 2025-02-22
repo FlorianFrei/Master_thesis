@@ -211,6 +211,7 @@ def adjust_BPOD_with_dead_time(BPOD, ITI):
     print(f"Mean value of dead_time2: {BPOD[BPOD['type'] == 'dead_time2']['state_len'].mean()}")
     print(f"Max absolute value of dead_time2: {BPOD[BPOD['type'] == 'dead_time2']['state_len'].abs().max()}")
     filtered_data = BPOD[BPOD['type'] == 'dead_time2']['state_len'].abs()
+    filtered_data = pd.to_numeric(filtered_data, errors='coerce')
     max_excluded = filtered_data.nlargest(2).iloc[-1]  # Get the second largest value
     print(f"Max absolute value of dead_time2 (excluding the highest): {max_excluded}")
 
@@ -221,7 +222,7 @@ def adjust_BPOD_with_dead_time(BPOD, ITI):
 
 def Ephys_wrangle(cluster_info,clust,times,sample_freq,surface_estimate):
     #takes raw KS vectos and turns them into a Dataframe  
-    #selects only clusters that have the PHY good label
+    #selects only clusters that have the PHY good or MUA label
     low_lim = surface_estimate - 1500
     up_lim = surface_estimate + 100
     
@@ -283,7 +284,7 @@ def Add_Behv(Ephys_binned,BPOD,raw_BPOD,ITI):
     return(EPHYS_trimmed)
 
 def Add_trial(EPHYS_trimmed):
-    # this should not be a thing. the trial information is already present in the raw BPOD but here i reconstruct them becuase i could not figure out how to transfer them
+    # this should not be used, just for legacy reasons 
     k=0
     trial =[]
     for i in range(len(EPHYS_trimmed)):
@@ -347,6 +348,7 @@ def check_trialnumber_matches(ITI,raw_BPOD):
 
 def is_M9_1(raw_BPOD, mat_name):
    """
+   here, I started the recording after the Behaviour and by trial and error found that the 29.th ITI is the first ITI in the EphysData
     Modify raw_BPOD for the specific .mat file and reset indexes if conditions are met.
     
     Parameters:
