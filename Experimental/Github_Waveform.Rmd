@@ -1,0 +1,490 @@
+---
+title: "Waveform_analysis"
+output: html_document
+date: "2025-02-04"
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r}
+library(tidyverse)
+source("C:/Users/Freitag/Documents/GitHub/Master_thesis/Analysis/Analysis/Master_helper.R")
+```
+
+# load data - non Opto
+```{r}
+Trialless <- read_csv("D:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Trialless.csv")
+
+
+
+metapath = "D:/Florian_paper/Florian/Aligned_Data/Analysable_data/meta"
+list_of_meta <- list.files(path = metapath,
+                             pattern = "\\.tsv$",
+                             full.names = TRUE)
+ meta <- read_tsv(list_of_meta, id = 'id2') %>%  as_tibble()%>% select(id2,cluster_id,n_spikes,depth,group,fr)
+meta <- meta %>% mutate(id = str_extract(meta$id2, "M\\d+_\\d+"))
+
+list_of_ptt <- list.files(path = "D:/Florian_paper/from_Desktop/peak_to_trough_times",
+                             pattern = "\\.csv$",
+                             full.names = TRUE)
+ptt <- read_csv(list_of_ptt, id = 'id2') %>%  as_tibble()
+
+translator <- read_csv2("C:/Users/Freitag/Desktop/folder_contents.csv")
+
+Trialless <- Trialless %>%  left_join(meta %>% left_join(ptt %>% separate(Original_Index, into = c("old", "second_part"), sep = "(?=_row)", extra = "merge", remove = FALSE) %>% left_join(translator) %>% select(second_part:new) %>% select(!Folder) %>% separate_wider_delim(second_part, delim ='_' ,names =c('d1','d2','cluster_id')) %>% select(cluster_id:new) %>% rename(id = new) %>% mutate(cluster_id = as.numeric(cluster_id)) %>% filter(`Peak_to_Valley (ms)` > 0)) %>% replace_na(list(`Peak_to_Valley (ms)`=0)) %>% mutate(newgroup = ifelse(`Peak_to_Valley (ms)`==0,group,'FS')) %>% filter(group!= 'noise', newgroup!= 'noise')) %>% select(Behv:Zscore, newgroup) %>% filter(newgroup!= 'noise')
+```
+
+# Plot - non Opto
+```{r}
+
+
+    ord <- Trialless  %>% filter(between(rel_time,0,0.1)) %>% group_by(cluster_id2)  %>%
+      filter(Behv == 'A2L') %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  
+  
+  
+  
+  
+  # z score and filter
+  g1 <- Trialless  %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time,newgroup)
+  
+
+  
+  #apply order 
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+  
+  #heatmap
+  map <-g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv,scales = 'free')+
+    scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    labs(fill='Z- scored FR') 
+  
+   #activity across all units
+  smo <- g1 %>% group_by(Behv,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv)+
+    theme_minimal()
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  # arrange plots
+  plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+
+  library(export)
+# x11() # open graphics window
+# # now maximize this window so it is full screen
+# 
+#  
+# print(plot)
+# graph2png(x= plot, file='C:/Users/Freitag/Desktop/waveform',
+#          width = dev.size(units="px")[[1]]/90,
+#          height = dev.size(units="px")[[2]]/90,
+#          dpi = 900)
+# 
+# dev.off() 
+# 
+# g1 %>% distinct(cluster_id2, newgroup) %>% count(newgroup)
+#   
+
+
+```
+# depth plot - non Opto 
+```{r}
+
+Trialless <- add_layers(Trialless,"D:/Florian_paper/Florian/Aligned_Data/Analysable_data/depths")
+   ord <- Trialless %>% filter(between(dist_surf,-50,1210))  %>% distinct(cluster_id2, dist_surf) %>%   arrange(dist_surf)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  
+  
+  
+  
+  
+  # z score and filter
+  g1 <- Trialless %>% filter(between(dist_surf,-50,1210)) %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time,newgroup)
+  
+
+  
+  #apply order 
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+  
+  #heatmap
+  map <-g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv,scales = 'free')+
+    scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    labs(fill='Z- scored FR') 
+  
+   #activity across all units
+  smo <- g1 %>% group_by(Behv,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv)+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  # arrange plots
+  plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+  
+g2 <- Trialless %>% filter(Behv =='A2L') %>% filter(between(dist_surf,-50,1210)) %>% filter(between(rel_time,-1,1)) %>% select(Layer,Layer_fine,cluster_id2,Zscore,rel_time,newgroup)
+txtx =  g2  %>% distinct(cluster_id2, Layer, newgroup) %>% group_by(Layer,newgroup) %>% count()
+   g2 %>% group_by(Layer,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(Layer~newgroup)+
+    theme_minimal()+
+     geom_text(data=txtx, aes(x=1.8, y=5, label=n), 
+            colour="black", inherit.aes=FALSE, parse=FALSE)
+```
+
+# load data -  Opto
+```{r}
+Trialless <- read_csv("D:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Trialless.csv")
+
+
+metapath = "D:/Florian_paper/Florian/Aligned_Data/otpo/meta"
+list_of_meta <- list.files(path = metapath,
+                             pattern = "\\.tsv$",
+                             full.names = TRUE)
+ meta <- read_tsv(list_of_meta, id = 'id2') %>%  as_tibble()%>% select(id2,cluster_id,n_spikes,depth,group,fr)
+  meta <- meta %>% mutate(id = str_extract(meta$id2, "O\\d+_[A-Za-z0-9]"))
+  
+
+
+list_of_ptt <- list.files(path = "D:/Florian_paper/Florian/Aligned_Data/otpo/PTT_times",
+                             pattern = "\\.csv$",
+                             full.names = TRUE)
+ptt <- read_csv(list_of_ptt, id = 'id2') %>%  as_tibble()
+
+translator <- read_csv2("C:/Users/Freitag/Desktop/folder_contents.csv")
+
+Trialless <- Trialless %>%  left_join(meta %>% left_join(ptt %>% separate(Original_Index, into = c("new", "second_part"), sep = "(?=_row)", extra = "merge", remove = FALSE)  %>% select(new:`Peak_to_Valley (ms)`)  %>% separate_wider_delim(second_part, delim ='_' ,names =c('d1','d2','cluster_id')) %>% select(new,cluster_id,`Peak_to_Valley (ms)`) %>% rename(id = new) %>% mutate(cluster_id = as.numeric(cluster_id)) %>% filter(`Peak_to_Valley (ms)` > 0)) %>% replace_na(list(`Peak_to_Valley (ms)`=0)) %>% mutate(newgroup = ifelse(`Peak_to_Valley (ms)`==0,group,'FS')) %>% filter(group!= 'noise', newgroup!= 'noise')) %>% select(Behv:Zscore, newgroup) %>% filter(newgroup!= 'noise') %>% filter(Behv2 %in% c('Airpuff','Opto_Air','just_opto'))
+
+Trialless %>% count(Behv)
+```
+# Plot - Optp
+```{r}
+  ord <- Trialless %>% filter(phase=='cortex')  %>% filter(between(rel_time,0,0.1)) %>% group_by(cluster_id2)  %>%
+      filter(Behv == 'Airpuff') %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  
+  
+  
+  
+  
+  # z score and filter
+  g1 <-  Trialless %>% filter(phase=='cortex') %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time,newgroup)
+  
+
+  
+  #apply order 
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+  
+  #heatmap
+  map <-g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv,scales = 'free',space='free')+
+    scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    labs(fill='Z- scored FR') 
+  
+   #activity across all units
+  smo <- g1 %>% group_by(Behv,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv)+
+    theme_minimal()
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  # arrange plots
+  plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+
+  library(export)
+# x11() # open graphics window
+# # # now maximize this window so it is full screen
+# # 
+# #  
+# print(plot)
+# graph2png(x= plot, file='C:/Users/Freitag/Desktop/waveform',
+#          width = dev.size(units="px")[[1]]/90,
+#          height = dev.size(units="px")[[2]]/90,
+#          dpi = 900)
+# 
+# dev.off() 
+# 
+# g1 %>% distinct(cluster_id2, newgroup) %>% count(newgroup)
+#   
+
+
+ord <- Trialless %>% filter(phase=='Thalamus')  %>% filter(between(rel_time,0,0.1)) %>% group_by(cluster_id2)  %>%
+      filter(Behv == 'Airpuff') %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  
+  
+  
+  
+  
+  # z score and filter
+  g1 <-  Trialless %>% filter(phase=='Thalamus') %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time,newgroup)
+  
+
+  
+  #apply order 
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+  
+  #heatmap
+  map <-g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv,scales = 'free',space='free')+
+    scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    labs(fill='Z- scored FR') 
+  
+   #activity across all units
+  smo <- g1 %>% group_by(Behv,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv)+
+    theme_minimal()
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  # arrange plots
+  plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+```
+
+# depth plot - Opto 
+```{r}
+list_of_depth <- list.files(path = "D:/Florian_paper/Florian/Aligned_Data/otpo/depths",
+                              pattern = "\\.csv$",
+                              full.names = TRUE)
+  depth <- read_csv(list_of_depth, id = 'id',col_names = F)
+  depth <- depth %>% mutate(id = str_extract(depth$id, "O\\d+_[A-Za-z0-9]")) %>% rename('surface'=X1)
+  
+  
+  Layerd <- Trialless%>% separate_wider_delim(cluster_id2, delim ='_', names = c('del', 'Mouse','Day'), cols_remove = F) %>% unite('id', c(Mouse,Day)) %>%
+    select(!del) %>% 
+    left_join(depth) %>% replace_na(list(surface = 950)) %>% 
+    mutate(dist_surf = surface - depth) %>% 
+    mutate(Layer_fine = case_when(
+      between(dist_surf,-500,-20) ~ 'out',
+      between(dist_surf,-20,50) ~ 'L1',
+      between(dist_surf,50,500) ~ 'L2/3',
+      between(dist_surf,500,750) ~ 'L5A',
+      between(dist_surf,750,1050) ~ 'L5B',
+      between(dist_surf,1050,1210) ~ 'L6',
+      .default = "WTF"
+    )) %>% 
+    mutate(Layer= case_when(
+    between(dist_surf,-500,-20) ~ 'out',
+    between(dist_surf,-20,500) ~ 'L2/3',
+    between(dist_surf,500,1210) ~ 'L5',
+    .default = "WTF")) %>% 
+      mutate(depthcat = case_when(
+      between(dist_surf,-500,-20) ~ 'out',
+      between(dist_surf,-20,300) ~ '0-33',
+      between(dist_surf,300,600) ~ '300-600',
+      between(dist_surf,600,900) ~ '600-900',
+      between(dist_surf,900,1220) ~ '900-1200',
+      .default = "WTF"
+    ))
+```
+
+
+```{r}
+
+ord <- Layerd %>% filter(phase=='cortex') %>% filter(between(dist_surf,-50,1210))  %>% distinct(cluster_id2, dist_surf) %>%   arrange(dist_surf)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  
+  
+  
+  
+  
+  # z score and filter
+  g1 <-  Layerd %>% filter(phase=='cortex') %>% filter(between(dist_surf,-50,1210)) %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time,newgroup)
+  
+
+  
+  #apply order 
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+  
+  #heatmap
+  map <-g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv,scales = 'free')+
+    scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    labs(fill='Z- scored FR') 
+  
+   #activity across all units
+  smo <- g1 %>% group_by(Behv,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv)+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  # arrange plots
+  plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+  
+g2 <- Layerd%>% filter(phase=='cortex')  %>% filter(Behv =='Opto_Air') %>% filter(between(dist_surf,-50,1210)) %>% filter(between(rel_time,-1,1)) %>% select(Layer,Layer_fine,cluster_id2,Zscore,rel_time,newgroup)
+txtx =  g2  %>% distinct(cluster_id2, Layer, newgroup) %>% group_by(Layer,newgroup) %>% count()
+   g2 %>% group_by(Layer,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(Layer~newgroup)+
+    theme_minimal()+
+     geom_text(data=txtx, aes(x=1.8, y=5, label=n), 
+            colour="black", inherit.aes=FALSE, parse=FALSE)
+   
+   
+   g2 <- Layerd%>% filter(phase=='cortex')  %>% filter(Behv =='Opto_Air') %>% filter(between(dist_surf,-20,1210)) %>% filter(between(rel_time,-1,1)) %>% select(Layer,Layer_fine,depthcat,cluster_id2,Zscore,rel_time,newgroup)
+txtx =  g2  %>% distinct(cluster_id2, depthcat, newgroup) %>% group_by(depthcat,newgroup) %>% count()
+   g2 %>% group_by(depthcat,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(depthcat~newgroup)+
+    theme_minimal()+
+     geom_text(data=txtx, aes(x=1.8, y=5, label=n), 
+            colour="black", inherit.aes=FALSE, parse=FALSE)
+```
+
+# for thalamus
+```{r}
+ord <- Layerd %>% filter(phase=='Thalamus') %>% filter(between(dist_surf,-50,1210))  %>% distinct(cluster_id2, dist_surf) %>%   arrange(dist_surf)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  
+  
+  
+  
+  
+  # z score and filter
+  g1 <-  Layerd %>% filter(phase=='Thalamus') %>% filter(between(dist_surf,-50,1210)) %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time,newgroup)
+  
+
+  
+  #apply order 
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+  
+  #heatmap
+  map <-g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv,scales = 'free')+
+    scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    labs(fill='Z- scored FR') 
+  
+   #activity across all units
+  smo <- g1 %>% group_by(Behv,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv)+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  # arrange plots
+  plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+  
+g2 <- Layerd%>% filter(phase=='Thalamus')  %>% filter(Behv =='Opto_Air') %>% filter(between(dist_surf,-50,1210)) %>% filter(between(rel_time,-1,1)) %>% select(Layer,Layer_fine,cluster_id2,Zscore,rel_time,newgroup)
+txtx =  g2  %>% distinct(cluster_id2, Layer, newgroup) %>% group_by(Layer,newgroup) %>% count()
+   g2 %>% group_by(Layer,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(Layer~newgroup)+
+    theme_minimal()+
+     geom_text(data=txtx, aes(x=1.8, y=5, label=n), 
+            colour="black", inherit.aes=FALSE, parse=FALSE)
+   
+    g2 <- Layerd%>% filter(phase=='Thalamus')  %>% filter(Behv =='Opto_Air') %>% filter(between(dist_surf,-20,1210)) %>% filter(between(rel_time,-1,1)) %>% select(Layer,Layer_fine,depthcat,cluster_id2,Zscore,rel_time,newgroup)
+txtx =  g2  %>% distinct(cluster_id2, depthcat, newgroup) %>% group_by(depthcat,newgroup) %>% count()
+   g2 %>% group_by(depthcat,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(depthcat~newgroup)+
+    theme_minimal()+
+     geom_text(data=txtx, aes(x=1.8, y=5, label=n), 
+            colour="black", inherit.aes=FALSE, parse=FALSE)
+```
+

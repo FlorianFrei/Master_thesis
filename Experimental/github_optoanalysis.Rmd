@@ -1,0 +1,428 @@
+---
+title: "Opto_analysis"
+output: html_document
+date: "2025-01-24"
+editor_options: 
+  chunk_output_type: inline
+---
+# load data and libraries
+```{r,echo = FALSE,message = FALSE,warning = FALSE}
+library(tidyverse)
+library(ggpubr)
+library(export)
+library(emmeans)
+
+source("C:/Users/Freitag/Documents/GitHub/Master_thesis/Analysis/Analysis/Master_helper.R")
+source("C:/Users/Freitag/Documents/GitHub/Master_thesis/Analysis/Data_wrangling/wrangling_helper.R")
+Trialless <- data.table::fread("D:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Trialless.csv")
+
+Trialless %>% summarise(range(depth))
+
+Data <- load_opto("D:/Florian_paper/Florian/Aligned_Data/otpo/Data","D:/Florian_paper/Florian/Aligned_Data/otpo/meta" )
+
+Data %>% summarise(range(depth))
+
+Data %>% filter(id == 'O1_1') %>% distinct(cluster_id) %>% arrange(cluster_id)
+```
+
+# overview plots
+```{r,echo = FALSE,message = FALSE,warning = FALSE}
+
+
+#plot_overview_perID(Trialless%>% filter(phase == "cortex")  %>% mutate(Behv = Behv2), orderby_Behv = "Airpuff")
+
+
+A <- Plot_overview(Trialless %>% filter(phase == "cortex") %>% filter(between(rel_time,0,0.06)) %>% mutate(Behv = Behv2), orderby_Behv = "Airpuff")
+
+plot<- ggarrange(A, ncol=1, nrow=1, common.legend = TRUE,legend="bottom")
+
+C <- annotate_figure(plot, top = text_grob("Cortex", 
+               color = "red", face = "bold", size = 24))
+
+B <- Plot_overview(Trialless %>% filter(phase == "Thalamus") %>% filter(between(rel_time,0,0.06)) %>% mutate(Behv = Behv2), orderby_Behv = "Airpuff")
+
+
+plot2 <- ggarrange(B, ncol=1, nrow=1, common.legend = TRUE,legend="bottom")
+
+D <- annotate_figure(plot2, top = text_grob("Thalamus", 
+               color = "red", face = "bold", size = 24))
+
+pplot <- ggarrange(C,D,common.legend = TRUE,legend="right")
+#ggsave("C:/Users/Freitag/Desktop/Opto.tiff", bg= 'white')
+
+
+
+
+pplot
+
+x11() # open graphics window
+# now maximize this window so it is full screen
+
+ 
+print(pplot)
+# graph2png(x= pplot, file='C:/Users/Freitag/Desktop/Opto',
+#          width = dev.size(units="px")[[1]]/90, 
+#          height = dev.size(units="px")[[2]]/90, 
+#          dpi = 900)
+  
+dev.off() 
+
+
+```
+
+# overview stats
+```{r,echo = FALSE,message = FALSE,warning = FALSE}
+# based on max activity of each unit
+
+statc <- Trialless  %>% filter(phase =='cortex') %>% filter(Behv2 != 'noforce') %>% 
+  mutate(rel_time = rel_time * 1000) %>%
+  filter(between(rel_time, 0, 40)) %>%
+  group_by(cluster_id2, Behv2) %>%
+  slice_max(abs(Zscore))
+
+modc <- lm(data=statc, Zscore~Behv2)
+
+fit2.emm.ac <- emmeans(modc, "Behv2", data=statc)
+plot(pairs(fit2.emm.ac, adjust="tukey"))
+
+
+statT  <- Trialless %>% filter(phase =='Thalamus') %>% filter(Behv2 != 'noforce') %>% 
+  mutate(rel_time = rel_time * 1000) %>%
+  filter(between(rel_time, 0, 40)) %>%
+  group_by(cluster_id2, Behv2) %>%
+  slice_max(abs(Zscore))
+
+modt <- lm(data=statT, Zscore~Behv2)
+
+fit2.emm.at <- emmeans(modt, "Behv2", data=statT)
+plot(pairs(fit2.emm.at, adjust="tukey"))
+
+# based on all activity
+
+
+statc <- Trialless  %>% filter(phase =='cortex') %>% filter(Behv2 != 'noforce') %>% 
+  mutate(rel_time = rel_time * 1000) %>%
+  filter(between(rel_time, 0, 40)) 
+
+modc <- lm(data=statc, Zscore~Behv2)
+
+fit2.emm.ac <- emmeans(modc, "Behv2", data=statc)
+plot(pairs(fit2.emm.ac, adjust="tukey"))
+
+
+statT  <- Trialless %>% filter(phase =='Thalamus') %>% filter(Behv2 != 'noforce') %>% 
+  mutate(rel_time = rel_time * 1000) %>%
+  filter(between(rel_time, 0, 40))
+
+modt <- lm(data=statT, Zscore~Behv2)
+
+fit2.emm.at <- emmeans(modt, "Behv2", data=statT)
+plot(pairs(fit2.emm.at, adjust="tukey"))
+```
+
+# focus on Airpuff vs OptoAir
+```{r,echo = FALSE,message = FALSE,warning = FALSE}
+
+TestdataC = Trialless  %>% filter(phase =='cortex') %>% mutate(rel_time = ifelse(Behv2 =='Airpuff',rel_time-0.02,rel_time)) %>% filter(Behv2 %in% c('Airpuff','Opto_Air')) %>% mutate(rel_time = round(rel_time,2)) %>% filter(phase=='cortex')
+
+TestdataC %>%  filter(between(rel_time,0,0.05)) %>%   group_by(Behv2,cluster_id2,rel_time) %>% summarise(mr = (mean(Zscore))) %>% pivot_wider(names_from = Behv2, values_from = mr) %>% mutate(diff = Airpuff - Opto_Air) %>% group_by(rel_time) %>% mutate(mrl = mean(diff),med = median(diff)) %>%   ungroup()  %>% ggplot(aes(diff))+
+  geom_histogram()+
+  facet_wrap(~as.factor(rel_time))+
+   geom_vline(aes(xintercept = mrl))+
+  xlim(-4,4)
+
+
+TestdataC %>%  filter(between(rel_time,0,0.05)) %>% group_by(rel_time, Behv2) %>% summarise( mz = mean(Zscore), sd = sd(Zscore), se = sd / sqrt(n())) %>% ggplot()+
+  geom_ribbon(aes(rel_time,mz, ymin = mz-se, ymax = mz+se, fill = Behv2),alpha =0.2)+
+  geom_line(aes(rel_time,mz,col = Behv2))+
+  theme_minimal()
+
+
+
+
+
+timepoints <- c(0, 0.01, 0.02, 0.03, 0.04)
+resultsC <- map_df(timepoints, function(tp) {
+  test_data <- TestdataC %>% filter(between(rel_time, tp, tp))
+  # Run the Wilcoxon test
+  test_res <- wilcox.test(data = test_data, Zscore ~ Behv2)
+  
+  # Use broom::tidy to extract results and add the current timepoint
+  broom::tidy(test_res) %>%
+    mutate(rel_time = tp) %>%
+    select(rel_time, p.value)
+})
+
+# View the results
+
+
+knitr::kable(TestdataC %>%  filter(between(rel_time,0,0.04)) %>% group_by(rel_time, Behv2) %>% summarise( mz = mean(Zscore)) %>% pivot_wider(names_from = Behv2, values_from = mz) %>% mutate(perc_red = 100-((Opto_Air /Airpuff)*100)) %>% left_join(resultsC) %>%  mutate(padj = round(p.adjust(p.value,method = "BH"),5)))
+
+
+
+# same for Thalamus
+
+TestdataT = Trialless  %>% filter(phase =='Thalamus') %>% mutate(rel_time = ifelse(Behv2 =='Airpuff',rel_time-0.02,rel_time)) %>% filter(Behv2 %in% c('Airpuff','Opto_Air')) %>% mutate(rel_time = round(rel_time,2)) 
+
+TestdataT %>%  filter(between(rel_time,0,0.05)) %>% group_by(Behv2,cluster_id2,rel_time) %>% summarise(mr = (mean(Zscore))) %>% pivot_wider(names_from = Behv2, values_from = mr) %>% mutate(diff = Airpuff - Opto_Air) %>% group_by(rel_time) %>% mutate(mrl = mean(diff),med = median(diff)) %>%   ungroup()  %>% ggplot(aes(diff))+
+  geom_histogram()+
+  facet_wrap(~as.factor(rel_time))+
+   geom_vline(aes(xintercept = mrl))+
+  xlim(-4,4)
+
+
+TestdataT %>%  filter(between(rel_time,0,0.05)) %>% group_by(rel_time, Behv2) %>% summarise( mz = mean(Zscore), sd = sd(Zscore), se = sd / sqrt(n())) %>% ggplot()+
+  geom_ribbon(aes(rel_time,mz, ymin = mz-se, ymax = mz+se, fill = Behv2),alpha =0.2)+
+  geom_line(aes(rel_time,mz,col = Behv2))+
+  theme_minimal()
+
+
+
+
+
+timepoints <- c(0, 0.01, 0.02, 0.03, 0.04)
+resultsT <- map_df(timepoints, function(tp) {
+  test_data <- TestdataT %>% filter(between(rel_time, tp, tp))
+  # Run the Wilcoxon test
+  test_res <- wilcox.test(data = test_data, Zscore ~ Behv2)
+  
+  # Use broom::tidy to extract results and add the current timepoint
+  broom::tidy(test_res) %>%
+    mutate(rel_time = tp) %>%
+    select(rel_time, p.value)
+})
+
+# View the results
+
+
+knitr::kable(TestdataT %>%  filter(between(rel_time,0,0.04)) %>% group_by(rel_time, Behv2) %>% summarise( mz = mean(Zscore)) %>% pivot_wider(names_from = Behv2, values_from = mz) %>% mutate(perc_red = 100-((Opto_Air /Airpuff)*100)) %>% left_join(resultsT) %>%  mutate(padj = round(p.adjust(p.value,method = "BH"),5)))
+
+
+
+```
+
+
+
+# new glmm stats
+```{r}
+stat <- Trialless %>% filter(!Behv2 %in% c('noforce', 'Behind')) %>% 
+  mutate(rel_time = rel_time * 1000) %>%
+  filter(between(rel_time, 0, 40)) %>%
+  group_by(cluster_id2, Behv2) %>%
+  slice_max(abs(Zscore)) %>% ungroup %>% mutate(Zscore = (Zscore - min(Zscore)) +1) 
+
+stat %>% distinct(Behv2)
+
+stat %>% ggplot(aes(Zscore))+
+  geom_histogram()
+
+ mod <- lme4::glmer(data = stat, Zscore ~ Behv2*phase  + (1|id), family = Gamma(link = 'inverse'))
+
+
+
+DHARMa::simulateResiduals(fittedModel = mod, plot = T,refit=F,use.u = T)
+
+
+
+plot(pairs(emmeans(mod, pairwise ~ Behv2 | phase)))
+ 
+```
+```{r}
+Testdatac = Trialless  %>% filter(phase =='cortex') %>% mutate(rel_time = ifelse(Behv2 =='Airpuff',rel_time-0.02,rel_time)) %>% filter(Behv2 %in% c('Airpuff','Opto_Air')) %>% mutate(rel_time = round(rel_time,2)) %>%  filter(between(rel_time, 0, 0.04))   %>% ungroup %>% mutate(timecat = as.factor(rel_time))  %>% mutate(Zscore = (Zscore - min(Zscore)) +1)
+
+
+
+Testdatac %>% ggplot(aes(Zscore,fill = Behv2))+
+  geom_histogram()+
+  facet_wrap(~timecat)
+
+Testdatac %>% group_by(Behv2, rel_time) %>% summarise(mz = mean(Zscore)) %>% ggplot(aes(rel_time,mz, col = Behv2))+
+  geom_line()
+                       
+
+modc <- lme4::glmer(data = Testdatac , Zscore ~ Behv2*timecat  + (1|id), family = Gamma(link = 'inverse'))
+DHARMa::simulateResiduals(fittedModel = modc, plot = T,refit=F,use.u = T)
+emmeans(modc, pairwise ~ Behv2 | timecat, type = 'response')
+
+
+
+plot(pairs(emmeans(modc, pairwise ~ Behv2)))
+
+
+
+pvs <-emmeans(modc, pairwise ~ Behv2 | timecat, type = 'response')
+
+# Convert to tibble
+pdata <- pvs$emmeans %>% as_tibble() 
+pdata <- pdata %>% mutate(Layer = trimws(as.character(Layer)))
+
+# Prepare p-values
+pvals <- pvs$contrasts %>%
+  as_tibble() %>%
+  separate_wider_delim(contrast, names = c("group1", "group2"), delim = "-") %>%
+  mutate(psig = case_when(
+    p.value < 0.001 ~'***',
+    p.value < 0.01 ~'**',
+    p.value < 0.05 ~'*',
+     p.value > 0.05  ~'NS',
+  )) %>% 
+  mutate(group1 = as.character(group1), group2 = as.character(group2))  %>% mutate(group1 = trimws(group1), group2 = trimws(group2)) %>%  # Ensure character type
+  left_join(pdata %>% mutate(Behv2 = as.character(Behv2)), 
+            by = join_by(group1 ==Behv2, timecat)) %>%  # Join with corrected types
+  mutate(y.position = asymp.UCL + 0.5)
+# Plot
+ggplot(pdata, aes(x = Behv2, y = response)) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  geom_point()+
+  facet_wrap(~timecat)+
+  geom_text(aes(label = round(response, 2)), hjust = -1) +
+  ylab('max Zscore response')+
+  theme_bw()+
+  ggpubr::stat_pvalue_manual(pvals, label = "psig", 
+                             xmin = "group1", xmax = "group2", y.position = "y.position")
+ggsave('C:/Users/Freitag/Desktop/Opto_vsnonopto_A2L.tiff', bg='white')
+
+
+
+
+
+
+
+
+
+TestdataT = Trialless  %>% filter(phase =='Thalamus') %>% mutate(rel_time = ifelse(Behv2 =='Airpuff',rel_time-0.02,rel_time)) %>% filter(Behv2 %in% c('Airpuff','Opto_Air')) %>% mutate(rel_time = round(rel_time,2)) %>%  filter(between(rel_time, 0, 0.04))   %>% ungroup %>% mutate(timecat = as.factor(rel_time))  %>% mutate(Zscore = (Zscore - min(Zscore)) +1)
+
+
+
+TestdataT %>% ggplot(aes(Zscore,fill = Behv2))+
+  geom_histogram()+
+  facet_wrap(~timecat)
+
+TestdataT %>% group_by(Behv2, rel_time) %>% summarise(mz = mean(Zscore)) %>% ggplot(aes(rel_time,mz, col = Behv2))+
+  geom_line()
+                       
+
+modT <- lme4::glmer(data = TestdataT , Zscore ~ Behv2*timecat  + (1|id), family = Gamma(link = 'inverse'))
+DHARMa::simulateResiduals(fittedModel = modT, plot = T,refit=F,use.u = T)
+emmeans(modT, pairwise ~ Behv2 | timecat, type = 'response')
+
+
+
+plot(pairs(emmeans(modT, pairwise ~ Behv2|timecat)))
+plot(pairs(emmeans(modc, pairwise ~ Behv2|timecat)))
+```
+
+# test opto effect on Layers
+
+```{r}
+add_layers_opto<- function(Data, depthpath){
+  list_of_depth <- list.files(path = depthpath,
+                              pattern = "\\.csv$",
+                              full.names = TRUE)
+  depth <- read_csv(list_of_depth, id = 'id',col_names = F)
+  depth <- depth %>% mutate(id = str_extract(depth$id, "O\\d+_[A-Za-z0-9]")) %>% rename('surface'=X1)
+  
+  
+  Layerd <- Data %>% separate_wider_delim(cluster_id2, delim ='_', names = c('del', 'Mouse','Day'), cols_remove = F) %>% unite('id', c(Mouse,Day)) %>%
+    select(!del) %>% 
+    left_join(depth) %>% replace_na(list(surface = 950)) %>% 
+    mutate(dist_surf = surface - depth) %>% 
+    mutate(Layer_fine = case_when(
+      between(dist_surf,-500,-20) ~ 'out',
+      between(dist_surf,-20,50) ~ 'L1',
+      between(dist_surf,50,500) ~ 'L2/3',
+      between(dist_surf,500,750) ~ 'L5A',
+      between(dist_surf,750,1050) ~ 'L5B',
+      between(dist_surf,1050,1210) ~ 'L6',
+      .default = "WTF"
+    )) %>% 
+    mutate(Layer= case_when(
+    between(dist_surf,-500,-20) ~ 'out',
+    between(dist_surf,-20,500) ~ 'L2/3',
+    between(dist_surf,500,1210) ~ 'L5',
+    .default = "WTF"
+  ))
+  Layerd
+}
+
+Trialless <- add_layers_opto(Trialless, depthpath = "D:/Florian_paper/Florian/Aligned_Data/otpo/depths")
+
+Testdatadepthc = Trialless  %>% filter(phase =='cortex') %>% mutate(rel_time = ifelse(Behv2 =='Airpuff',rel_time-0.02,rel_time)) %>% filter(Behv2 %in% c('Airpuff','Opto_Air'), Layer %in% c('L2/3', 'L5')) %>% mutate(rel_time = round(rel_time,2)) %>%  filter(between(rel_time, -0.1, 0.1))   %>% ungroup %>% mutate(timecat = as.factor(rel_time))  %>% mutate(Zscore = (Zscore - min(Zscore)) +1)
+
+Testdatadepthc %>% group_by(Layer,rel_time) %>% summarise(mz = mean(Zscore)) %>% ggplot(aes(rel_time,mz,col=Layer))+
+  geom_line()
+
+modc <- lme4::glmer(data = Testdatadepthc , Zscore ~ Layer*timecat  + (1|id), family = Gamma(link = 'inverse'))
+DHARMa::simulateResiduals(fittedModel = modc, plot = T,refit=F,use.u = T)
+plot(pairs(emmeans(modc, pairwise ~ Layer | timecat, type = 'response')))
+
+
+
+# the issue: there are differences between l5 and l23, so even if the opto had no effect they will show different
+# solution 1: per unit Zscore of Airpuff -Zscore opto = activity chnage caused by opto
+Testdatadepthc %>% group_by(rel_time,cluster_id2,Behv,Layer) %>% summarise(mean(Zscore)) %>% pivot_wider(names_from = Behv, values_from = 'mean(Zscore)') %>% ungroup() %>% mutate(change = round(Airpuff - Opto_Air,4)) %>% group_by(rel_time,Layer) %>% summarise (mz = mean(change)) %>% ggplot(aes(rel_time,mz,col=Layer))+
+  geom_line()
+
+Testdatadepthc %>% group_by(rel_time,cluster_id2,Behv,Layer) %>% summarise(mean(Zscore)) %>% pivot_wider(names_from = Behv, values_from = 'mean(Zscore)') %>% ungroup() %>% mutate(change = round(Airpuff - Opto_Air,4)) %>%  ggplot(aes(rel_time,change,col=Layer))+
+  geom_smooth(method = 'loess', span =0.3)
+
+# solution 2: A glmm that models the Behv*Layer*rel_time interaction
+
+Testdatac = Trialless  %>% filter(phase =='cortex') %>% mutate(rel_time = ifelse(Behv2 =='Airpuff',rel_time-0.02,rel_time)) %>% filter(Behv2 %in% c('Airpuff','Opto_Air'), Layer %in% c('L2/3', 'L5')) %>% mutate(rel_time = round(rel_time,2)) %>%  filter(between(rel_time, 0, 0.04))   %>% ungroup %>% mutate(timecat = as.factor(rel_time))  %>% mutate(Zscore = (Zscore - min(Zscore)) +1)
+
+mod <- lme4::glmer(data = Testdatac, Zscore ~ Behv*Layer*timecat + (1|id), family =  Gamma)
+DHARMa::simulateResiduals(fittedModel = mod, plot = T,refit=F,use.u = T)
+emmeans(mod, pairwise ~ Behv2 | timecat, type = 'response')
+
+car::Anova(mod)
+
+emmip(mod, Layer ~ timecat | Behv)
+
+noise.emm <- emmeans(mod, ~ Behv*Layer*timecat)
+
+emmeans(mod, ~Behv*Layer)
+
+
+mod01 <- lme4::glmer(data = Testdatac %>% filter(timecat == 0.01), Zscore ~ Behv*Layer + (1|id), family =  Gamma)
+DHARMa::simulateResiduals(fittedModel = mod01, plot = T,refit=F,use.u = T)
+emmeans(mod01, pairwise ~ Layer | Behv, type = 'response')
+car::Anova(mod01)
+
+
+mod02 <- lme4::glmer(data = Testdatac %>% filter(timecat == 0.04), Zscore ~ Behv*Layer + (1|id), family =  Gamma)
+DHARMa::simulateResiduals(fittedModel = mod02, plot = T,refit=F,use.u = T)
+car::Anova(mod02)
+emm <- emmeans(mod02, ~ Layer * Behv)
+contrast(emm, interaction = "pairwise")
+
+plot(pairs(emmeans(emm, pairwise ~ Behv | Layer)))
+#ggsave('C:/Users/Freitag/Desktop/Opto_layer_diff.tiff', bg='white')
+plot(contrast(emm, interaction = "pairwise"))
+
+emmeans(mod02, ~Layer:Behv,type ='response')
+emmeans(mod02, ~Layer|Behv)
+
+emm <- emmeans(mod, ~ Layer * Behv)
+
+
+pairs(emm, by = "Layer")  # Compare Opto vs. No Opto separately for L2 and L5
+
+contrast(emm, interaction = "pairwise", by = "Layer")
+contrast(emm, interaction = "pairwise", simple = "each", combine = TRUE)
+contrast(emm, interaction = "pairwise")
+
+ emm <- emmeans(mod, ~ Layer * Behv,type = 'response')
+ contrast(emm, interaction = "pairwise", infer = TRUE)
+ 
+ summary(contrast(emm, interaction = "pairwise"), type = 'response')
+ 
+ 
+emm_resp <- emmeans(mod, ~ Layer * Behv, type = "response")
+pairs(regrid(emm_resp, by = "Layer"))  # Compare Opto vs. No Opto per layer
+
+plot(contrast(emm, interaction = "pairwise"))
+
+```
+
+
+
