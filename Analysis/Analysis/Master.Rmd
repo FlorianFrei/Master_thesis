@@ -277,6 +277,55 @@ Trialless %>%
   ggtitle("neurons per session")
 ```
 
+# single unit plots
+```{r}
+su <- combcont %>% filter(cluster_id2 %in% c('78_M2_3','50_M6_3','44_M_1'))
+
+plot_single_unit(su,'78_M2_3')
+
+plot_single_unit2 <- function(Combcont,cluster_id,smoothness = 0.2){
+  
+  Datatemp <- Combcont %>% filter(cluster_id2 == !!cluster_id) %>%  filter(event_count > 0, between(rel_time, -1, 1)) %>%  group_by(Behv) %>%
+    mutate(t2 = dense_rank(Trial))
+  
+  if (nrow(Datatemp) == 0) {
+    stop("No data found for the specified cluster_id and filtering criteria.")
+  }
+  
+  
+  # Create the PSTH
+  map <- Datatemp %>% 
+    ggplot() +
+    geom_jitter(aes(rel_time,t2), height = 0.2,size=0.5) +
+    facet_wrap(~Behv, scales = 'free_y')+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    scale_x_discrete(labels = NULL, breaks = NULL)+
+    labs(x = NULL)
+  
+  #density plot
+  smo <- Datatemp  %>%
+    ggplot() +
+    geom_density(aes(rel_time), bw = smoothness) +
+    facet_wrap(~Behv, scales = 'free_y')+
+    theme_minimal()+
+   theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        axis.text=element_text(size=12),
+        axis.title=element_text(size=20,face="bold"))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  plot <- ggpubr::ggarrange(map,smo,  heights = c(2, 0.8), vjust = c(0.5, 0.5),
+                            ncol = 1, nrow = 2, align = "v", common.legend = TRUE, legend = 'right')
+  
+  plot
+}
+
+
+```
 
 
 

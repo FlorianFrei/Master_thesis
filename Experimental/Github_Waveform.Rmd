@@ -53,31 +53,38 @@ Trialless <- Trialless %>%  left_join(meta %>% left_join(ptt %>% separate(Origin
   
   #apply order 
   g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
-  
+  g1 <- g1 %>% mutate(newgroup = case_when(
+    newgroup=='FS'~'FS',
+    newgroup=='good'~'regular',
+    newgroup=='mua'~'inverted',
+    .default = 'Fuck'))
   
   #heatmap
   map <-g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
     geom_tile()+
     geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
-    facet_grid(newgroup~Behv,scales = 'free')+
+    facet_grid(newgroup~Behv,scales = 'free',space = "free",switch = "y")+
     scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
     theme_void()+
     theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
-          strip.text.x = element_text(size = 30))+
-    labs(fill='Z- scored FR') 
+          strip.text.x = element_text(size = 30),
+          strip.text.y = element_text(size = 20,angle = 90,margin = margin(r = 8)))+
+    labs(fill='Z- scored FR')+
+    guides(fill = guide_colorbar(barheight = 10, barwidth = 2, ticks = FALSE)) 
   
    #activity across all units
   smo <- g1 %>% group_by(Behv,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
     geom_line()+
     geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
     geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
-    facet_grid(newgroup~Behv)+
-    theme_minimal()
+    facet_grid(newgroup~Behv,,switch = "y")+
+    theme_minimal()+
     theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
           strip.background = element_blank(),
-          strip.text.x = element_blank(),
-          axis.text=element_text(size=12),
-          axis.title=element_text(size=20,face="bold"))+
+          strip.text = element_blank(),
+          axis.text.y=element_blank(),
+          axis.title.x=element_text(size=20),
+          axis.title.y=element_text(size=18))+
     xlab("time from stimulus")+
     ylab("Z-scored FR")
   
@@ -87,23 +94,153 @@ Trialless <- Trialless %>%  left_join(meta %>% left_join(ptt %>% separate(Origin
   plot
 
   library(export)
-# x11() # open graphics window
-# # now maximize this window so it is full screen
-# 
-#  
-# print(plot)
-# graph2png(x= plot, file='C:/Users/Freitag/Desktop/waveform',
-#          width = dev.size(units="px")[[1]]/90,
-#          height = dev.size(units="px")[[2]]/90,
-#          dpi = 900)
-# 
-# dev.off() 
-# 
+x11() # open graphics window
+# now maximize this window so it is full screen
+
+
+print(plot)
+graph2tif(x= plot, file='C:/Users/Freitag/Desktop/waveform',
+         width = dev.size(units="px")[[1]]/90,
+         height = dev.size(units="px")[[2]]/90,
+         dpi = 900)
+
+dev.off()
+
 # g1 %>% distinct(cluster_id2, newgroup) %>% count(newgroup)
 #   
 
+?facet_grid
+  
+  
+   g1 %>% group_by(Behv,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv)+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.text = element_blank(),
+          axis.text=element_blank(),
+          axis.title=element_text(size=16))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+   
+   g1 %>% distinct(newgroup)
+```
+
+# Waveform stats
+```{r}
+
+Trialless
+
+Trialless <- Trialless %>% left_join(Trialless %>% filter(rel_time < 0) %>% group_by(Behv,newgroup) %>% summarise(bl = mean(Zscore))) %>% ungroup %>% mutate(Zscore = Zscore - bl)
+
+Test4_org <- Trialless  %>%  distinct(newgroup,rel_time,Behv,Zscore, cluster_id2,id)%>% filter(between(rel_time,0,0.04))  %>%  group_by(newgroup,cluster_id2,Behv) %>% slice_max(Zscore) %>% distinct(newgroup,Behv,cluster_id2,id,Zscore) %>% separate_wider_delim(id, names = c('Mouse','Session'), delim = '_') %>% ungroup %>% na.omit()
+
+Test4 <- Test4_org %>%  mutate(Zscore = Zscore - min(Zscore) +1) %>% mutate(across(c(newgroup,Behv,Mouse,Session), as.factor))
+
+mod3 <-lme4::glmer(data= Test4, Zscore ~ Behv + newgroup + Behv*newgroup + (1 |Mouse) + (1 | Mouse:Session), family =  Gamma(link='inverse'))
+mod0 <-lme4::glmer(data= Test4, Zscore ~ 1 + (1 |Mouse) + (1 | Mouse:Session), family =  Gamma(link='inverse'))
+
+anova(mod3,mod0)
+
+
+res <- DHARMa::simulateResiduals(fittedModel = mod3, plot = T,refit=F,use.u = T)
+DHARMa::plotQQunif(res, testUniformity = F,testOutliers = F,testDispersion = F)
+
+
+
+
+library(emmeans)
+
+emmeans::emmeans(mod3, pairwise ~ newgroup)
+
+# layer conditional
+laycon <- emmeans(mod3, pairwise ~newgroup| Behv)
+laycon
+
+
+
+
+emmeans_Behv_simp <- emmeans::emmeans(mod3, ~ newgroup , type = "response")
+behvcon_simp <- emmeans::emmeans(mod3, pairwise ~ newgroup)
+# Convert to tibble
+pdata <- emmeans_Behv_simp %>% as_tibble() %>% mutate(newgroup = as.character(newgroup))
+pdata <- pdata %>% mutate(newgroup = trimws(as.character(newgroup)))
+
+# Prepare p-values
+pvals <- behvcon_simp$contrasts %>%
+  as_tibble() %>%
+  separate_wider_delim(contrast, names = c("group1", "group2"), delim = "-") %>%
+  mutate(psig = case_when(
+    p.value < 0.001 ~'***',
+    p.value < 0.01 ~'**',
+    p.value < 0.05 ~'*',
+     p.value > 0.05  ~'NS',
+  )) %>%
+  mutate(group1 = as.character(group1), group2 = as.character(group2))  %>% mutate(group1 = trimws(group1), group2 = trimws(group2)) %>%  # Ensure character type
+  left_join(pdata %>% mutate(newgroup = as.character(newgroup)), 
+            by = join_by(group1 == newgroup))
+
+# Plot
+ ggplot(pdata %>% mutate(response = response + min(Test4_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(Test4_org$Zscore)-1) %>% mutate(newgroup = case_when(
+    newgroup=='FS'~'FS',
+    newgroup=='good'~'regular',
+    newgroup=='mua'~'inverted',
+    .default = 'Fuck')) %>% mutate(newgroup= factor(newgroup, levels=c("FS", "regular", "inverted"))), aes(x = newgroup, y = response)) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  geom_point()+
+  geom_text(aes(label = round(response, 2)), hjust = -1) +
+  theme_minimal()+
+  ylab('max Zscore response')+
+  ggpubr::stat_pvalue_manual(pvals %>% mutate(response = response + min(Test4_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(Test4_org$Zscore)-1)  %>% mutate(group1 = case_when(
+    group1=='FS'~'FS',
+    group1=='good'~'regular',
+    group1=='mua'~'inverted',
+    .default = 'Fuck')) %>% mutate(group2 = case_when(
+    group2=='FS'~'FS',
+    group2=='good'~'regular',
+    group2=='mua'~'inverted',
+    .default = 'Fuck')) %>%  mutate(y.position = asymp.UCL + 0.2, y.position = ifelse(group1=='FS' & group2=='inverted', y.position+0.2,y.position)), label = "psig", 
+                             xmin = "group1", xmax = "group2", y.position = "y.position")+
+  coord_fixed(ratio=0.4)
+ggsave('C:/users/Freitag/Desktop/waveform_stats.tiff', bg= 'white',dpi=900)
+
+
+ 
+
+boxdata <- Test4_org  %>% group_by(newgroup) %>%
+  summarise(min = max(quantile(Zscore, probs = 0),quantile(Zscore, probs = 0.25)*1.5),
+            lower = quantile(Zscore, probs = 0.25),
+            median = quantile(Zscore, probs = 0.5),
+            mean = mean(Zscore),
+            higher = quantile(Zscore, probs = 0.75),
+            max = min(quantile(Zscore, probs = 1),quantile(Zscore, probs = 0.75)*1.5))
+
+ggplot(boxdata, aes(x=newgroup, ymin = min, lower = lower, middle = mean, upper = higher, ymax = max)) +
+  geom_boxplot(stat = "identity")+
+  theme_minimal()+
+   ggpubr::stat_pvalue_manual(pvals  %>% mutate(y.position = boxdata$max + 0.5, y.position = ifelse(group1=='FS' & group2=='mua', y.position+1,y.position)) %>% select(group1,group2,psig,y.position) %>% bind_cols(boxdata), label = "psig", 
+                             xmin = "group1", xmax = "group2", y.position = "y.position")
+  coord_fixed(ratio=0.5)
+  
+? ggpubr::stat_pvalue_manual
+  
+pr <-  Test4_org %>%  filter(newgroup != 'mua') %>% group_by(newgroup) %>% summarise( mean = mean(Zscore), median = median(Zscore))
+  
+  Test4_org %>% filter(newgroup != 'mua') %>% ggplot()+
+    geom_density(aes(Zscore,col= newgroup))+
+    geom_vline(data=pr,aes(xintercept = mean,col= newgroup, linetype ='1' ))+
+    geom_vline(data=pr,aes(xintercept = median,col= newgroup, linetype ='2' ))
+  
+ Test4_org %>% ggplot(aes(newgroup,Zscore))+
+   geom_boxplot()
+ 
+ 
+ 
 
 ```
+
 # depth plot - non Opto 
 ```{r}
 
@@ -127,7 +264,7 @@ Trialless <- add_layers(Trialless,"D:/Florian_paper/Florian/Aligned_Data/Analysa
   map <-g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
     geom_tile()+
     geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
-    facet_grid(newgroup~Behv,scales = 'free')+
+    facet_grid(newgroup~Behv,scales = 'free',space = "free")+
     scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
     theme_void()+
     theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
