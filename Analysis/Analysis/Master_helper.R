@@ -214,6 +214,56 @@ plot_single_unit <- function(Combcont,cluster_id,smoothness = 0.2){
   plot
 }
 
+plot_single_unit2 <- function(Combcont,cluster_id,smoothness = 0.1){
+  
+  Datatemp <- Combcont %>% filter(cluster_id2 == !!cluster_id) %>%  filter(event_count > 0, between(rel_time, -1, 1)) %>%  group_by(Behv) %>%
+    mutate(t2 = dense_rank(Trial))
+  
+  dots <- su %>% filter(cluster_id2 == !!cluster_id) %>%  filter(event_count > 0, between(rel_time, -1, 1)) %>%  group_by(Behv) %>%
+    mutate(t2 = dense_rank(Trial))
+  avg<- su %>% filter(cluster_id2 == !!cluster_id) %>%  filter(event_count > 0, between(rel_time, -1, 1)) %>%  group_by(Behv,rel_time) %>% summarise(a = sum(event_count),n_trials) %>% distinct() %>%
+    mutate(rate=(a/n_trials)/0.01 )
+  
+  if (nrow(Datatemp) == 0) {
+    stop("No data found for the specified cluster_id and filtering criteria.")
+  }
+  
+  
+  # Create the PSTH
+  map <- dots %>% 
+    ggplot() +
+    geom_jitter(aes(rel_time,t2), height = 0.2,size=0.5) +
+    facet_wrap(~Behv, scales = 'free_y')+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30),
+          axis.text=element_text(size=10),
+        axis.title=element_text(size=16,face="bold"))+
+    scale_x_continuous(labels = NULL, breaks = NULL)+
+    scale_y_discrete(labels = NULL)+
+    labs(x = NULL)+
+     ylab("Trials")
+  
+  #density plot
+  smo <- avg  %>%
+    ggplot(aes(rel_time,rate))+
+  geom_smooth(span=smoothness,col='black')+
+    facet_wrap(~Behv, scales='free_y')+
+    theme_minimal()+
+   theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=16,face="bold"))+
+    xlab("time from stimulus")+
+    ylab("FR")
+  
+  plot <- ggpubr::ggarrange(map,smo,  heights = c(2, 0.8), vjust = c(0.5, 0.5),
+                            ncol = 1, nrow = 2, align = "v", common.legend = TRUE, legend = 'right')
+  
+  plot
+}
+
 plot_single_unit_top <- function(Combcont,cluster_id,smoothness = 0.03){
   
   Datatemp <- Combcont %>% filter(cluster_id2 == !!cluster_id) %>%  filter(event_count > 0, between(rel_time, -1, 1)) %>%  group_by(Behv) %>%

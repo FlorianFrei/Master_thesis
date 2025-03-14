@@ -4,6 +4,13 @@ Created on Tue Feb 20 13:24:50 2024
 
 @author: Florian Freitag
 """
+
+import os
+
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+os.chdir(dname)
+
 import numpy as np
 import pandas as pd
 from Zeta_helper import*

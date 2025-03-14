@@ -20,21 +20,21 @@ source("C:/Users/Freitag/Documents/GitHub/Master_thesis/Analysis/Analysis/Master
 
 # load data
 ```{r}
-Data <- data.table::fread("D:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/final_combined_data.csv", showProgress = T)
-combcont <- data.table::fread("D:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/combcont.csv",showProgress=T)
-Trialless <- read_csv("D:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Trialless.csv")
-Trialless %>% summarise(range(depth))
+#Data <- data.table::fread("D:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/final_combined_data.csv", showProgress = T)
+#combcont <- data.table::fread("D:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/combcont.csv",showProgress=T)
+Trialless <- read_csv("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Trialless.csv")
+
 # Zeta <- read_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Unit_Behv.csv")
 
-combcont %>% select(cluster_id2,rel_time,Behv,Trial2,event_count) %>% filter(between(rel_time,-1,1)) %>% arrange(-event_count)
+
 ```
 
 # overview plots
 ```{r}
 Plot_overview(Trialless, orderby_Behv = "A2L", by_time = F, theme_smo = theme_minimal())
-ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/overview_7_12_bigtext.tiff", bg = "white", width = 12, height = 7)
+#ggsave('C:/users/Freitag/Desktop/Overview.tiff', bg= 'white',dpi=900)
 Plot_overview(Trialless, orderby_Behv = "A2L", by_time = T, theme_smo = theme_minimal())
-ggsave("E:/Florian/Aligned_Data/Analysable_data/figures//overview_byTime.tiff", bg = "white")
+#ggsave("E:/Florian/Aligned_Data/Analysable_data/figures//overview_byTime.tiff", bg = "white")
 
 
 
@@ -44,8 +44,7 @@ plot_overview_perID(Trialless, orderby_Behv = "A2L", save = "E:/Florian/Aligned_
 
 # Layer plots
 ```{r}
-Layerd <- add_layers(Trialless, depthpath = "E:/Florian/Aligned_Data/Analysable_data/depths")
-
+Layerd <- add_layers(Trialless, depthpath = "E:/Florian_paper/Florian/Aligned_Data/Analysable_data/depths")
 
 
 Layerd %>%
@@ -60,8 +59,11 @@ Layerd %>%
   facet_grid(Layer ~ Behv) +
   theme_minimal() +
   xlab("time from stimulus") +
-  ylab("Z-scored FR")
-ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/Layers.tiff", bg = "white")
+  ylab("Z-scored FR")+ 
+  theme(strip.text.x = element_text(size = 25),
+         axis.title=element_text(size=18))
+#ggsave('C:/users/Freitag/Desktop/LayerOV.tiff', bg= 'white',dpi=900)
+
 
 
 Layerd %>%
@@ -77,7 +79,7 @@ Layerd %>%
   theme_minimal() +
   xlab("time from stimulus") +
   ylab("Z-scored FR")
-ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/Layers_fine.tiff", bg = "white")
+#ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/Layers_fine.tiff", bg = "white")
 
 Layerd %>%
   mutate(Zscore = Zscore + case_when(
@@ -100,7 +102,7 @@ Layerd %>%
   theme_minimal() +
   xlab("time from stimulus") +
   ylab("Z-scored FR")
-ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/Layers_fine_butdifferent.tiff", bg = "white")
+#ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/Layers_fine_butdifferent.tiff", bg = "white")
 
 
 
@@ -120,59 +122,10 @@ Layerd %>%
   geom_histogram(aes(dist_surf, fill = Layer_fine), binwidth = 20) +
   geom_text(data = labels, aes(x, y, label = n))
 
-ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/what_are_layers.tiff", bg = "white")
+#ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/what_are_layers.tiff", bg = "white")
 ```
 
-# Predictive coding - amplitude and latency to peak differences
-```{r}
-Trialless2 <- Trialless %>% filter(Behv %in% c("A2L", "PC"))
-Trialless2 <- add_layers(Trialless, depthpath = "E:/Florian/Aligned_Data/Analysable_data/depths")
 
-
-g2 <- Trialless %>%
-  filter(Behv %in% c("A2L", "PC")) %>%
-  filter(between(rel_time, -1, 1)) %>%
-  select(Behv, cluster_id2, Zscore, rel_time, rate) %>%
-  group_by(rel_time, Behv) %>%
-  summarise(rate3 = mean(rate), sd = sd(rate), se = sd / sqrt(n())) %>%
-  ungroup()
-g2 %>% slice_max(rate3)
-g2 %>% ggplot(aes(rel_time, rate3, col = Behv)) +
-  geom_line() +
-  geom_vline(xintercept = g2 %>% slice_max(rate3) %>% pull(rel_time))
-
-
-stat <- Trialless2 %>%
-  mutate(rel_time = rel_time * 1000) %>%
-  filter(between(rel_time, 0, 50)) %>%
-  filter(Behv %in% c("A2L", "PC")) %>%
-  group_by(cluster_id2, Behv) %>%
-  slice_max(abs(Zscore)) %>%
-  filter(Layer %in% c("L5", "L2/3"))
-
-stat %>% ggplot(aes(rel_time, fill = Behv)) +
-  geom_histogram(binwidth = 10)
-stat %>% ggplot(aes(Zscore, fill = Behv)) +
-  geom_histogram(binwidth = 0.1)
-
-stat %>% ggplot(aes(y = rel_time, x = Behv)) +
-  geom_violin()
-stat %>% ggplot(aes(y = Zscore, x = Behv)) +
-  geom_violin()
-
-pairs(emmeans::emmeans(lm(data = stat, rel_time ~ Behv), "Behv"), adjust = "Tukey")
-plot(emmeans::emmeans(lm(data = stat, rel_time ~ Behv), "Behv"), comparisons = T)
-pairs(emmeans::emmeans(lm(data = stat, Zscore ~ Behv), "Behv"), adjust = "Tukey")
-plot(emmeans::emmeans(lm(data = stat, Zscore ~ Behv), "Behv"), comparisons = T)
-
-
-
-t.test(data = stat, rel_time ~ Behv)
-t.test(data = stat, Zscore ~ Behv)
-
-wilcox.test(stat$rel_time ~ stat$Behv)
-wilcox.test(data = stat, Zscore ~ Behv)
-```
 
 #PC plots
 ```{r}
@@ -279,135 +232,20 @@ Trialless %>%
 
 # single unit plots
 ```{r}
-su <- combcont %>% filter(cluster_id2 %in% c('78_M2_3','50_M6_3','44_M_1'))
-
-plot_single_unit(su,'78_M2_3')
-
-plot_single_unit2 <- function(Combcont,cluster_id,smoothness = 0.2){
-  
-  Datatemp <- Combcont %>% filter(cluster_id2 == !!cluster_id) %>%  filter(event_count > 0, between(rel_time, -1, 1)) %>%  group_by(Behv) %>%
-    mutate(t2 = dense_rank(Trial))
-  
-  if (nrow(Datatemp) == 0) {
-    stop("No data found for the specified cluster_id and filtering criteria.")
-  }
-  
-  
-  # Create the PSTH
-  map <- Datatemp %>% 
-    ggplot() +
-    geom_jitter(aes(rel_time,t2), height = 0.2,size=0.5) +
-    facet_wrap(~Behv, scales = 'free_y')+
-    theme_minimal()+
-    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
-          strip.text.x = element_text(size = 30))+
-    scale_x_discrete(labels = NULL, breaks = NULL)+
-    labs(x = NULL)
-  
-  #density plot
-  smo <- Datatemp  %>%
-    ggplot() +
-    geom_density(aes(rel_time), bw = smoothness) +
-    facet_wrap(~Behv, scales = 'free_y')+
-    theme_minimal()+
-   theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
-        strip.background = element_blank(),
-        strip.text.x = element_blank(),
-        axis.text=element_text(size=12),
-        axis.title=element_text(size=20,face="bold"))+
-    xlab("time from stimulus")+
-    ylab("Z-scored FR")
-  
-  plot <- ggpubr::ggarrange(map,smo,  heights = c(2, 0.8), vjust = c(0.5, 0.5),
-                            ncol = 1, nrow = 2, align = "v", common.legend = TRUE, legend = 'right')
-  
-  plot
-}
-
-
-```
+combcont <- data.table::fread("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/combcont.csv",showProgress=T)
+L2 <- add_layers(combcont %>% filter(between(rel_time,-1,1)), depthpath = "D:/Florian_paper/Florian/Aligned_Data/Analysable_data/depths")
+su <-L2 %>% filter(cluster_id2 %in% c('78_M2_3','50_M6_3','44_M2_1'))
 
 
 
-```{r}
-contlick_w2T <- data.table::fread("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/contlick_W2T.csv")
-contlick <- contlick_w2T %>% left_join(contlick_w2T %>% group_by(id) %>% distinct(Trial) %>% summarise(n_trials = n()))
-Triallesslick <- contlick %>%
-  group_by(rel_time, cluster_id2) %>%
-  mutate(rate = (sum(event_count) / n_trials), rate = rate / 0.01) %>%
-  ungroup() %>%
-  distinct(rel_time, cluster_id2, rate, n_spikes, depth, group, fr, n_trials) %>%
-  group_by(cluster_id2) %>%
-  mutate(Zscore = (rate - mean(rate)) / sd(rate))
-```
+plot_single_unit2(su,'78_M2_3',0.1)
+ggsave('C:/users/Freitag/Desktop/78_M2_3_ds850.tiff', bg= 'white',dpi=900)
 
-```{r}
-Triallesslick <- Triallesslick %>%
-  ungroup() %>%
-  filter(cluster_id2 %in% Lick_filt)
-ord <- Triallesslick %>%
-  filter(between(rel_time, -1, 1)) %>%
-  group_by(cluster_id2) %>%
-  group_by(cluster_id2) %>%
-  summarise(ord = mean(Zscore)) %>%
-  arrange(ord) %>%
-  mutate(cluster_id2 = as.factor(cluster_id2)) %>%
-  pull(cluster_id2)
+plot_single_unit2(su,'44_M2_1',0.1)
+ggsave('C:/users/Freitag/Desktop/44_M2_1_ds270.tiff', bg= 'white',dpi=900)
 
-
-
-
-# z score and filter
-g1 <- Triallesslick %>%
-  filter(between(rel_time, -1, 1)) %>%
-  select(cluster_id2, Zscore, rel_time)
-
-
-
-# apply order
-g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
-
-
-map <- g1 %>% ggplot(aes(rel_time, cluster_id2, fill = Zscore)) +
-  geom_tile() +
-  geom_vline(xintercept = 0, col = "grey", linetype = "dashed") +
-  scale_fill_gradient2(low = "darkblue", mid = "beige", high = "red") +
-  theme_void() +
-  theme(
-    plot.margin = unit(c(0, 0.2, 0, 1), "lines"),
-    strip.text.x = element_text(size = 30)
-  ) +
-  labs(fill = "Z- scored FR")
-
-
-# activity across all units
-smo <- g1 %>%
-  group_by(rel_time) %>%
-  summarise(rate3 = mean(Zscore), sd = sd(Zscore), se = sd / sqrt(n())) %>%
-  ggplot(aes(rel_time, rate3)) +
-  geom_line() +
-  geom_ribbon(aes(ymin = rate3 - se, ymax = rate3 + se), alpha = 0.4, fill = "black") +
-  geom_vline(xintercept = 0, col = "darkgrey", linetype = "dashed") +
-  theme_minimal() +
-  theme(
-    plot.margin = unit(c(0.1, 0.2, 0, 1), "lines"),
-    strip.background = element_blank(),
-    strip.text.x = element_blank(),
-    axis.text = element_text(size = 12),
-    axis.title = element_text(size = 20, face = "bold")
-  ) +
-  xlab("time from stimulus") +
-  ylab("Z-scored FR")
-
-# arrange plots
-plot <- ggpubr::ggarrange(map, smo,
-  heights = c(2, 0.8), vjust = c(0.5, 0.5),
-  ncol = 1, nrow = 2, align = "v", common.legend = T, legend = "right"
-)
-plot
-
-
-Triallesslick %>% distinct(cluster_id2)
+plot_single_unit2(su,'50_M6_3',smoothness = 0.1)
+ggsave('C:/users/Freitag/Desktop/50_M6_3_ds770.tiff', bg= 'white',dpi=900)
 ```
 
 
@@ -415,29 +253,30 @@ Triallesslick %>% distinct(cluster_id2)
 
 
 
-#Trialless with depth
+# stats for Trialless with depth
 ```{r}
-#cretae Testdata
-# Per Unit Pick the timebin between 0 and 40 ms that had the highest Zscore to account for timing differences between the Airpuffs and the Whisking
-Trialless <- add_layers(Trialless,"D:/Florian_paper/Florian/Aligned_Data/Analysable_data/depths" )
+library(emmeans)
+
+Trialless <- add_layers(Trialless,"E:/Florian_paper/Florian/Aligned_Data/Analysable_data/depths" )
 Trialless <- Trialless %>% left_join(Trialless %>% filter(rel_time < 0) %>% group_by(Behv,Layer) %>% summarise(bl = mean(Zscore))) %>% ungroup %>% mutate(Zscore = Zscore - bl)
 
-Test4 <- Trialless  %>%  distinct(Layer,rel_time,Behv,Zscore, cluster_id2,id)%>% filter(between(rel_time,0,0.04)) %>%  filter(Layer %in% c('L2/3','L5')) %>%  group_by(Layer,cluster_id2,Behv) %>% slice_max(Zscore) %>% distinct(Layer,Behv,cluster_id2,id,Zscore) %>% separate_wider_delim(id, names = c('Mouse','Session'), delim = '_') %>% ungroup %>% na.omit() %>%  mutate(Zscore = Zscore - min(Zscore) +1) %>% mutate(across(c(Layer,Behv,Mouse,Session), as.factor))
+# for backtransforming later
+Test4_org <- Trialless  %>%  distinct(Layer,rel_time,Behv,Zscore, cluster_id2,id)%>% filter(between(rel_time,0,0.04)) %>%  filter(Layer %in% c('L2/3','L5')) %>%  group_by(Layer,cluster_id2,Behv) %>% slice_max(Zscore) %>% distinct(Layer,Behv,cluster_id2,id,Zscore) %>% separate_wider_delim(id, names = c('Mouse','Session'), delim = '_') %>% ungroup %>% na.omit()
 
+# make all values positive to use Beta distribution
+Test4 <- Test4_org %>%  mutate(Zscore = Zscore - min(Zscore) +1) %>% mutate(across(c(Layer,Behv,Mouse,Session), as.factor))
 
-Test4 %>% ggplot(aes(Zscore))+
-  geom_histogram()+
-  facet_grid(Layer~Behv)
 
 # fit and test the model
 mod3 <-lme4::glmer(data= Test4, Zscore ~ Behv + Layer + Behv*Layer + (1 |Mouse) + (1 | Mouse:Session), family =  Gamma(link='inverse'))
 mod0 <-lme4::glmer(data= Test4, Zscore ~ 1 + (1 |Mouse) + (1 | Mouse:Session), family =  Gamma(link='inverse'))
 
-mod3
+anova(mod3,mod0)
 
 
 res <- DHARMa::simulateResiduals(fittedModel = mod3, plot = T,refit=F,use.u = T)
 DHARMa::plotQQunif(res, testUniformity = F,testOutliers = F,testDispersion = F)
+
 
 #Post hoc
 # do test on model scale
@@ -447,41 +286,19 @@ emmeans::emmeans(mod3, pairwise ~ Behv)
 
 
 # Behv conditional 
-behvcon <- emmeans(mod31, pairwise ~ Behv| Layer)
-behvcon
-# overall Layer
+emmeans(mod3, pairwise ~ Behv| Layer)
 
+# overall Layer
 emmeans::emmeans(mod3, pairwise ~ Layer)
 
 # layer conditional
-laycon <- emmeans(mod31, pairwise ~Layer| Behv)
-laycon
+emmeans(mod3, pairwise ~Layer| Behv)
 
 # for values, response scale
 
 
-emmeans_results <- emmeans::emmeans(mod31, ~ Behv| Layer, type = "response")
-plot(emmeans_results)
-pairs(regrid(emmeans_results), reverse = F)
-
-emmeans_results <- emmeans::emmeans(mod31, ~ Layer| Behv, type = "response")
-plot(emmeans_results)
-pairs(regrid(emmeans_results), reverse = F)
 
 
-
-
-emmeans_Behv <- emmeans::emmeans(mod31, ~ Behv| Layer, type = "response")
-pvals =behvcon$contrasts %>% as_tibble()  %>% separate_wider_delim(contrast, names=c('group1','group2'), delim = '-') %>% mutate(psig = '***') %>% mutate(y.position = pdata$asymp.UCL +1) %>% mutate(x= pdata$Layer)
-
-pdata <- emmeans_Behv%>% as_tibble()
-emmeans_Behv%>% as_tibble() %>%  mutate(Behv = as.character(Behv)) %>% ggplot(aes(Behv,response))+
-  geom_errorbar(aes(ymin= asymp.LCL, ymax = asymp.UCL))+
-  facet_wrap(~Layer)+
-  geom_point()+
-  geom_text(aes(label = round(response,2)),hjust = -1)+
-  theme_minimal()+
-  ggpubr::stat_pvalue_manual(pvals, label = 'psig')
 
 
 
@@ -490,7 +307,7 @@ pvals
 pdata
 
 
-emmeans_Layer <- emmeans::emmeans(mod31, ~ Layer| Behv, type = "response")
+emmeans_Layer <- emmeans::emmeans(mod3, ~ Layer| Behv, type = "response")
 
 
 emmeans_Layer %>% as_tibble() %>% ggplot(aes(Layer,response))+
@@ -502,7 +319,7 @@ emmeans_Layer %>% as_tibble() %>% ggplot(aes(Layer,response))+
 
 
 
-emmeans_Behv <- emmeans::emmeans(mod31, ~ Behv | Layer, type = "response")
+emmeans_Behv <- emmeans::emmeans(mod3, ~ Behv | Layer, type = "response")
 
 # Convert to tibble
 pdata <- emmeans_Behv %>% as_tibble() %>% mutate(Behv = as.character(Behv))
@@ -608,6 +425,98 @@ Trialless %>% filter(between(rel_time,0.01,0.04)) %>% group_by(Behv) %>% summari
 
 quantile(Trialless$Zscore)
 ```
+# plot for behv stats
+```{r}
+emmeans_Behv_simp <- emmeans::emmeans(mod3, ~ Behv , type = "response")
+behvcon_simp <- emmeans::emmeans(mod3, pairwise ~ Behv)
+# Convert to tibble
+pdata <- emmeans_Behv_simp %>% as_tibble() %>% mutate(Behv = as.character(Behv))
+pdata <- pdata %>% mutate(Behv = trimws(as.character(Behv)))
+
+# Prepare p-values
+pvals <- behvcon_simp$contrasts %>%
+  as_tibble() %>%
+  separate_wider_delim(contrast, names = c("group1", "group2"), delim = "-") %>%
+  mutate(psig = case_when(
+    p.value < 0.001 ~'***',
+    p.value < 0.01 ~'**',
+    p.value < 0.05 ~'*',
+     p.value > 0.05  ~'NS',
+  )) %>%
+  mutate(group1 = as.character(group1), group2 = as.character(group2))  %>% mutate(group1 = trimws(group1), group2 = trimws(group2)) %>%  # Ensure character type
+  left_join(pdata %>% mutate(Behv = as.character(Behv)), 
+            by = join_by(group1 == Behv))
+
+# Plot
+ggplot(pdata %>% mutate(response = response + min(Test4_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(Test4_org$Zscore)-1), aes(x = Behv, y = response)) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  geom_point()+
+  geom_text(aes(label = round(response, 2)), hjust = -1) +
+  theme_minimal()+
+  ylab('max Zscore response')+
+  ggpubr::stat_pvalue_manual(pvals %>% mutate(response = response + min(Test4_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(Test4_org$Zscore)-1, y.position = asymp.UCL + 0.5) %>% mutate(y.position = ifelse(group1=='A2L' & group2=='W2T', y.position+0.5,y.position)), label = "psig", 
+                             xmin = "group1", xmax = "group2", y.position = "y.position")+
+  coord_fixed(ratio=1)
+#ggsave('C:/users/Freitag/Desktop/Bhev_stats.tiff', bg= 'white',dpi=900)
+
+
+ 
+
+boxdata <- Trialless %>%  filter(between(rel_time,0,0.04)) %>%  filter(Layer %in% c('L2/3','L5')) %>% group_by(Behv) %>%
+  summarise(min = quantile(Zscore, probs = 0),
+            `25th` = quantile(Zscore, probs = 0.25),
+            median = quantile(Zscore, probs = 0.5),
+            mean = mean(Zscore),
+            `75th` = quantile(Zscore, probs = 0.75),
+            max = quantile(Zscore, probs = 1)) %>%  mutate(asymp.LCL = pdata$asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = pdata$asymp.UCL  + min(Test4_org$Zscore)-1)
+
+ggplot(boxdata, aes(x=Behv, ymin = asymp.LCL, lower = `25th`, middle = mean, upper = `75th`, ymax = asymp.UCL)) +
+  geom_boxplot(stat = "identity")+
+  theme_minimal()
+```
+# plots for Layer stats
+
+```{r}
+
+emmeans_Layer_simp <- emmeans::emmeans(mod3, ~ Layer , type = "response")
+Layercon_simp <- emmeans::emmeans(mod3, pairwise ~ Layer)
+# Convert to tibble
+pdata <- emmeans_Layer_simp %>% as_tibble() 
+pdata <- pdata %>% mutate(Layer = trimws(as.character(Layer)))
+
+# Prepare p-values
+pvals <- Layercon_simp$contrasts %>%
+  as_tibble() %>%
+  separate_wider_delim(contrast, names = c("group1", "group2"), delim = "-") %>%
+  mutate(psig = case_when(
+    p.value < 0.001 ~'***',
+    p.value < 0.01 ~'**',
+    p.value < 0.05 ~'*',
+     p.value > 0.05  ~'NS',
+  )) %>% mutate( group1 = 'L2/3')%>%
+  mutate(group1 = as.character(group1), group2 = as.character(group2))  %>% mutate(group1 = trimws(group1), group2 = trimws(group2)) %>%  # Ensure character type
+  left_join(pdata %>% mutate(Layer = as.character(Layer)), 
+            by = join_by(group1 ==Layer))
+# Plot
+ggplot(pdata %>% mutate(response = response + min(Test4_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(Test4_org$Zscore)-1), aes(x = Layer, y = response)) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  geom_point()+
+  geom_text(aes(label = round(response, 2)), hjust = -1) +
+  theme_minimal()+
+  ylab('max Zscore response')+
+  ggpubr::stat_pvalue_manual(pvals %>% mutate(response = response + min(Test4_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(Test4_org$Zscore)-1, y.position = asymp.UCL + 0.5) %>% mutate(y.position = ifelse(group1=='A2L' & group2=='W2T', y.position+0.5,y.position)), label = "psig", 
+                             xmin = "group1", xmax = "group2", y.position = "y.position")+
+  coord_fixed(ratio=1)
+#ggsave('C:/users/Freitag/Desktop/Layer_stats.tiff', bg= 'white',dpi=900)
+
+
+
+pvals %>% mutate(response = response + min(Test4_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(Test4_org$Zscore)-1, y.position = asymp.UCL + 0.5) %>% mutate(y.position = ifelse(group1=='A2L' & group2=='W2T', y.position+0.5,y.position))
+
+```
+
+
+`
 
 
 

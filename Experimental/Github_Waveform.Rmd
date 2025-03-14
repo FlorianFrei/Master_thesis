@@ -3,7 +3,7 @@ title: "Waveform_analysis"
 output: html_document
 date: "2025-02-04"
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 ```{r}
@@ -340,9 +340,10 @@ Trialless %>% count(Behv)
   
   # z score and filter
   g1 <-  Trialless %>% filter(phase=='cortex') %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time,newgroup)
-  
+  g1 <- g1 %>% group_by(newgroup) %>% complete(Behv,nesting(cluster_id2, rel_time), fill = list(Zscore = 0.1)) %>% filter(newgroup != 'NA')
 
-  
+g1 %>% group_by(Behv) %>% distinct(Behv,cluster_id2) %>% count()
+  ?complete
   #apply order 
   g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
   
@@ -364,7 +365,7 @@ Trialless %>% count(Behv)
     geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
     geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
     facet_grid(newgroup~Behv)+
-    theme_minimal()
+    theme_minimal()+
     theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
           strip.background = element_blank(),
           strip.text.x = element_blank(),
@@ -623,5 +624,170 @@ txtx =  g2  %>% distinct(cluster_id2, depthcat, newgroup) %>% group_by(depthcat,
     theme_minimal()+
      geom_text(data=txtx, aes(x=1.8, y=5, label=n), 
             colour="black", inherit.aes=FALSE, parse=FALSE)
+```
+
+
+# actal Opto plot
+```{r}
+ ord <- Trialless %>% filter(phase=='cortex')  %>% filter(between(rel_time,0,0.1)) %>% group_by(cluster_id2)  %>%
+      filter(Behv == 'Airpuff') %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  
+  
+  
+  
+  
+  # z score and filter
+  g1 <-  Trialless  %>% filter(between(rel_time,-1,1)) %>% select(phase,Behv,cluster_id2,Zscore,rel_time,newgroup)
+  g1 <- g1 %>% group_by(phase) %>% complete(Behv,nesting(cluster_id2, rel_time), fill = list(Zscore = 0.1)) %>% filter(phase != 'NA')
+  g1 <- g1 %>% mutate(Behv = case_when(
+    Behv == 'just_opto' ~ 'Opto_only',
+    Behv == 'Opto_Air' ~'Airpuff + Opto',
+    Behv == 'Airpuff' ~ 'Airpuff',
+    .default = 'WTF'
+  ))
+
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+  
+  #heatmap
+  map <-g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_grid(phase~Behv,scales = 'free',space='free')+
+    scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30),
+          strip.text.y = element_text(size = 20,angle = 270,margin = margin(r = 8)))+
+     guides(fill = guide_colorbar(barheight = 10, barwidth = 2, ticks = FALSE)) 
+    labs(fill='Z- scored FR') 
+  
+   #activity across all units
+  smo <- g1 %>% group_by(Behv,rel_time,phase) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(phase~Behv)+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"),
+           strip.text.y = element_text(size = 20,angle = 270,margin = margin(r = 8)))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+  
+  library(export)
+x11() # open graphics window
+# now maximize this window so it is full screen
+
+
+print(plot)
+graph2tif(x= plot, file='C:/Users/Freitag/Desktop/Opto_overview',
+         width = dev.size(units="px")[[1]]/90,
+         height = dev.size(units="px")[[2]]/90,
+         dpi = 900)
+
+dev.off()
+
+```
+
+# Opto stats
+```{r}
+
+Trialless <- Trialless %>% left_join(Trialless %>% filter(rel_time < 0) %>% group_by(Behv,newgroup) %>% summarise(bl = mean(Zscore))) %>% ungroup %>% mutate(Zscore = Zscore - bl)
+
+Test4_org <- Trialless  %>%  distinct(phase,rel_time,Behv,Zscore, cluster_id2,id)%>% filter(between(rel_time,0,0.04))  %>%  group_by(phase,cluster_id2,Behv) %>% slice_max(Zscore) %>% distinct(phase,Behv,cluster_id2,id,Zscore) %>% separate_wider_delim(id, names = c('Mouse','Session'), delim = '_') %>% ungroup %>% na.omit()
+
+Test4 <- Test4_org %>%  mutate(Zscore = Zscore - min(Zscore) +1) %>% mutate(across(c(phase,Behv,Mouse,Session), as.factor))
+
+mod3 <-lme4::glmer(data= Test4, Zscore ~ Behv + phase + Behv*phase + (1 |Mouse) + (1 | Mouse:Session), family =  Gamma(link='inverse'))
+mod0 <-lme4::glmer(data= Test4, Zscore ~ 1 + (1 |Mouse) + (1 | Mouse:Session), family =  Gamma(link='inverse'))
+
+anova(mod3,mod0)
+
+
+
+
+library(emmeans)
+
+emmeans::emmeans(mod3, pairwise ~ newgroup)
+
+# layer conditional
+emmeans(mod3, pairwise ~phase| Behv)
+emmeans(mod3, pairwise ~Behv| phase)
+laycon
+
+
+
+
+emmeans_Behv_simp <- emmeans::emmeans(mod3, ~ newgroup , type = "response")
+behvcon_simp <- emmeans::emmeans(mod3, pairwise ~ newgroup)
+# Convert to tibble
+pdata <- emmeans_Behv_simp %>% as_tibble() %>% mutate(newgroup = as.character(newgroup))
+pdata <- pdata %>% mutate(newgroup = trimws(as.character(newgroup)))
+
+# Prepare p-values
+pvals <- behvcon_simp$contrasts %>%
+  as_tibble() %>%
+  separate_wider_delim(contrast, names = c("group1", "group2"), delim = "-") %>%
+  mutate(psig = case_when(
+    p.value < 0.001 ~'***',
+    p.value < 0.01 ~'**',
+    p.value < 0.05 ~'*',
+     p.value > 0.05  ~'NS',
+  )) %>%
+  mutate(group1 = as.character(group1), group2 = as.character(group2))  %>% mutate(group1 = trimws(group1), group2 = trimws(group2)) %>%  # Ensure character type
+  left_join(pdata %>% mutate(newgroup = as.character(newgroup)), 
+            by = join_by(group1 == newgroup))
+
+# Plot
+ ggplot(pdata %>% mutate(response = response + min(Test4_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(Test4_org$Zscore)-1) %>% mutate(newgroup = case_when(
+    newgroup=='FS'~'FS',
+    newgroup=='good'~'regular',
+    newgroup=='mua'~'inverted',
+    .default = 'Fuck')) %>% mutate(newgroup= factor(newgroup, levels=c("FS", "regular", "inverted"))), aes(x = newgroup, y = response)) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  geom_point()+
+  geom_text(aes(label = round(response, 2)), hjust = -1) +
+  theme_minimal()+
+  ylab('max Zscore response')+
+  ggpubr::stat_pvalue_manual(pvals %>% mutate(response = response + min(Test4_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(Test4_org$Zscore)-1)  %>% mutate(group1 = case_when(
+    group1=='FS'~'FS',
+    group1=='good'~'regular',
+    group1=='mua'~'inverted',
+    .default = 'Fuck')) %>% mutate(group2 = case_when(
+    group2=='FS'~'FS',
+    group2=='good'~'regular',
+    group2=='mua'~'inverted',
+    .default = 'Fuck')) %>%  mutate(y.position = asymp.UCL + 0.2, y.position = ifelse(group1=='FS' & group2=='inverted', y.position+0.2,y.position)), label = "psig", 
+                             xmin = "group1", xmax = "group2", y.position = "y.position")+
+  coord_fixed(ratio=0.4)
+ggsave('C:/users/Freitag/Desktop/waveform_stats.tiff', bg= 'white',dpi=900)
+
+
+ 
+
+boxdata <- Test4_org  %>% group_by(newgroup) %>%
+  summarise(min = max(quantile(Zscore, probs = 0),quantile(Zscore, probs = 0.25)*1.5),
+            lower = quantile(Zscore, probs = 0.25),
+            median = quantile(Zscore, probs = 0.5),
+            mean = mean(Zscore),
+            higher = quantile(Zscore, probs = 0.75),
+            max = min(quantile(Zscore, probs = 1),quantile(Zscore, probs = 0.75)*1.5))
+
+ggplot(boxdata, aes(x=newgroup, ymin = min, lower = lower, middle = mean, upper = higher, ymax = max)) +
+  geom_boxplot(stat = "identity")+
+  theme_minimal()+
+   ggpubr::stat_pvalue_manual(pvals  %>% mutate(y.position = boxdata$max + 0.5, y.position = ifelse(group1=='FS' & group2=='mua', y.position+1,y.position)) %>% select(group1,group2,psig,y.position) %>% bind_cols(boxdata), label = "psig", 
+                             xmin = "group1", xmax = "group2", y.position = "y.position")
+  coord_fixed(ratio=0.5)
+
 ```
 
