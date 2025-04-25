@@ -1,0 +1,59 @@
+---
+title: "zeta_opto"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+source("E:/Florian_paper/Florian/Github/Master_thesis/Analysis/Analysis/Master_helper.R")
+basename = file.path("E:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Zetatests")
+Opto  <- read_csv(file.path(basename,'Opto.csv')) %>% mutate(Behv = 'justOpto')
+Airpuff <- read_csv(file.path(basename,'Airpuff.csv')) %>% mutate(Behv = 'Airpuff')
+Opto_Air  <- read_csv(file.path(basename,'Opto_Air.csv')) %>% mutate(Behv = 'Opto_Air')
+
+unit_num <-  read_csv("E:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Zetadata.csv") %>% unite('c2', c(Mouse,Day,cluster_id)) %>% distinct(c2) %>% summarise( n= n()) 
+unit_num$n
+#Trialless <- read_csv("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Trialless.csv")
+
+Data <- rbind(Opto,Airpuff,Opto_Air)%>% unite('unit', c(unit, Mouse,Day))  %>% filter(p_val < 0.05/3) %>% select(-'...1')
+
+```
+
+```{r}
+
+Data <- Data %>% filter(Behv != 'Opto_Air')
+Unit_behv <- Data %>%
+  group_by(unit) %>%                          # Group by unit
+  summarise(Behv_combined = paste(unique(Behv), collapse = "_"))
+
+
+Unit_Behv <- Data %>% left_join(Unit_behv) %>% distinct(unit,Behv_combined) 
+
+Unit_Behv %>% count(Behv_combined) %>% ggplot(aes(Behv_combined,n))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle=90))
+
+
+Data  %>% count(Behv) %>% rbind(tibble(Behv = 'NS', n = sum({.}$n)-unit_num$n)) %>% mutate(new='x')%>%   mutate(Behv = factor(Behv, levels = c('Opto_Air', 'Airpuff', 'justOpto', 'NS'))) %>% ggplot(aes(n,new,fill=Behv, group=Behv))+
+  geom_col(position=position_stack())+
+  geom_text(aes(label=n), size=7,position = position_stack(vjust = 0.5))+
+  theme_minimal()+
+  coord_fixed(ratio = 300)
+ggsave('C:/Users/Freitag/Desktop/Optozeta.tiff', dpi = 900, bg = 'white')
+
+
+Data  %>% count(Behv) %>% rbind(tibble(Behv = 'NS', n = unit_num$n-n_distinct(Data$unit))) %>% mutate(new='x')%>% mutate(nperc = (n / unit_num$n)*100) %>%   mutate(Behv = factor(Behv, levels = c('Opto_Air', 'Airpuff', 'justOpto', 'NS'))) %>% ggplot(aes(nperc,Behv))+
+  geom_col(position = position_stack())+
+  geom_text(aes(x=1,label=Behv),hjust = 0,col='white',size=7)+
+ coord_fixed(ratio = 8)+
+  theme_classic()+
+  theme(axis.text.y = element_blank() )
+ggsave('C:/Users/Freitag/Desktop/uff2.svg', bg='white')
+
+n_distinct(Data$unit)
+unit_num
+
+?geom_text
+```
+

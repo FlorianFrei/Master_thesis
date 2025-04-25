@@ -1,0 +1,291 @@
+---
+title: "git_binfreeopto"
+output: html_document
+date: "2025-01-29"
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r}
+library(tidyverse)
+source("C:/Users/Freitag/Documents/GitHub/Master_thesis/Analysis/Analysis/Master_helper.R")
+datapath = "E:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Binfree"
+metapath = "E:/Florian_paper/Florian/Aligned_Data/otpo/meta"
+
+list_of_data <- list.files(path = datapath,
+                             pattern = "\\.csv$",
+                             full.names = TRUE)
+
+  Data <- map_dfr(list_of_data, ~ read_csv(.x) %>% 
+                 mutate(group = basename(.x)))
+  Data <- Data %>% mutate(id = str_extract(Data$group, "O\\d+_[A-Za-z0-9]"))
+  
+  list_of_meta <- list.files(path = metapath,
+                             pattern = "\\.tsv$",
+                             full.names = TRUE)
+  meta <- read_tsv(list_of_meta, id = 'id2') %>%  as_tibble()%>% select(id2,cluster_id,n_spikes,depth,group,fr)
+  meta <- meta %>% mutate(id = str_extract(meta$id2, "O\\d+_[A-Za-z0-9]"))
+  
+
+  Data <- Data %>% select(!group) %>% left_join(meta %>% select(!id2),by = join_by(id,cluster_id))
+  # adds more data such as the behaviour,depth or Hit/miss based on which Trialtypes where present 
+  Data <- Data %>% mutate(Trial = sprintf('%03d',Trial)) %>% filter(group!='noise')
+  Data <- Data %>% unite('Trial2',c(id,Trial),remove=F) %>% ungroup() %>%  unite('cluster_id2',c(cluster_id,id),remove=F) 
+  Data <- Data %>% left_join(Data %>% group_by(id,event_label) %>% distinct(Trial) %>% summarise(n_trials = n()))
+
+  
+stat <- Data %>% mutate(time_from_event = time_from_event) %>% mutate(time2 = round(time_from_event,3))   %>%  group_by(cluster_id2,time2,event_label) %>% mutate(event_count = n()) %>% ungroup() %>%  distinct(cluster_id2,time2,id,n_trials,event_count,event_label) 
+
+Trialless <- stat %>% group_by(event_label,time2, cluster_id2)  %>% 
+    mutate(rate = (sum(event_count)/n_trials), rate = rate/0.001) %>% ungroup() %>% 
+    distinct(event_label,time2, cluster_id2,id,rate,n_trials) %>% group_by(cluster_id2) %>% 
+    mutate(sd = sd(rate), Zscore = (rate - mean(rate))/sd) %>% replace_na(list(Zscore = 0.1))
+
+Plot_overview(Trialless %>% mutate(Behv = event_label, rel_time = time2), orderby_Behv = 'Airpuff' )
+
+
+  
+stat %>% ggplot(aes(time2,event_count,col= event_label))+
+  geom_smooth()
+
+Trialless  %>%  group_by(time2,event_label) %>% summarise(fr = mean(rate)) %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2))%>% ggplot(aes(time2,fr,col=event_label))+
+  geom_line(alpha=0.4)+
+  geom_smooth(method = 'loess',span =0.1)
+
+stat %>% group_by(time2,event_label) %>% summarise(fr = mean(event_count)) %>% group_by(event_label) %>% slice_max(fr)
+
+Trialless %>% filter(between(time2,-20,100)) %>%  group_by(time2,event_label) %>% arrange(-Zscore)
+
+
+stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% filter(between(time2,-0.01,0.04)) %>% group_by(time2,event_label) %>% summarise( n= sum(event_count), nnorm =n/n_trials) %>%  ungroup() %>% distinct() %>% ggplot(aes(time2,nnorm,col= event_label))+
+  geom_line()+
+  geom_smooth(span = 0.09)
+
+stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% filter(between(time2,-0.1,0.4)) %>% group_by(time2,event_label) %>% summarise( n= sum(event_count), nnorm =n/n_trials) %>% ungroup() %>% distinct() %>% group_by(time2,event_label) %>% summarise(nnorm = mean(nnorm)) %>% ggplot(aes(time2,nnorm,col= event_label))+
+  geom_line()
+
+pplot <- stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% filter(between(time2,-0.1,0.4)) %>% group_by(id,time2,event_label) %>% summarise( n= sum(event_count), nnorm =n/n_trials) %>% ungroup() %>% distinct() %>% group_by(id,time2,event_label) %>% summarise(nnorm = mean(nnorm)) %>% ungroup() %>% ggplot(aes(time2,nnorm,col= event_label))+
+  geom_line()+
+  facet_wrap(~id,scale='free')
+
+
+x11() # open graphics window
+# now maximize this window so it is full screen
+
+ 
+print(pplot)
+library(export)
+graph2png(x= pplot, file='C:/Users/Freitag/Desktop/nozperid',
+         width = dev.size(units="px")[[1]]/90, # for me fullscreen is 17.06667
+         height = dev.size(units="px")[[2]]/90, # for me fullscreen is 8.588889
+         dpi = 900)
+  # or graph2pdf, graph2ppt, graph2svg to export to other formats
+  dev.off() # close win
+ggsave('C:/Users/Freitag/Desktop/noZ_id.png')
+
+"C:\Users\Freitag\Desktop\Florian"
+
+
+
+stat <- Data %>% mutate(time_from_event = time_from_event) %>% mutate(time2 = round(time_from_event,2))   %>%  group_by(cluster_id2,time2,event_label) %>% mutate(event_count = n()) %>% ungroup() %>%  distinct(cluster_id2,time2,id,n_trials,event_count,event_label) 
+
+
+
+stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% filter(between(time2,-0.1,0.4)) %>%
+  group_by(event_label,time2, cluster_id2)  %>%  mutate(rate = (sum(event_count)/n_trials)) %>% group_by(event_label,time2) %>% summarise(nnorm = sum(rate) / n_distinct(cluster_id2))  %>% 
+   ggplot(aes(time2,nnorm,col= event_label))+
+  geom_line()
+
+
+stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% filter(between(time2,-0.01,0.04)) %>% 
+  group_by(time2,event_label) %>% summarise( n= sum(event_count), nnorm =n/n_trials) %>% ungroup() %>% distinct() %>% group_by(time2,event_label) %>% summarise(nnorm = mean(nnorm)) %>% 
+  ggplot(aes(time2,nnorm,col= event_label))+
+  geom_line()
+
+wilcox.test(data = stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% filter(between(time2,0.01,0.02)) %>% mutate(nnorm = event_count/n_trials),nnorm~event_label )
+
+wilcox.test(data=stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% filter(between(time2,0.01,0.02)) %>%
+  group_by(event_label,time2, cluster_id2)  %>%  mutate(rate = (sum(event_count)/n_trials)),rate~event_label)
+
+stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% filter(between(time2,0.02,0.03)) %>% mutate(nnorm = event_count/n_trials) %>% ggplot(aes(event_label,nnorm))+
+  geom_boxplot()
+
+
+stat  %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% mutate(pp = ifelse(time2 > 0,'post','pre')) %>% group_by(pp)
+
+
+stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% filter(between(time2,-0.95,0.95)) %>% 
+  group_by(time2,event_label) %>% summarise( n= sum(event_count), nnorm =n/n_trials) %>% ungroup() %>% distinct() %>% group_by(time2,event_label) %>% summarise(nnorm = mean(nnorm)) %>% mutate(pp = ifelse(time2 > 0,'post','pre'))  %>% left_join( x = ., y = {.}%>% group_by(pp, event_label)%>% summarise( mpsa = mean(nnorm)) %>% ungroup() %>%  filter(pp == 'pre') %>% select(!pp)) %>% mutate(nnorm = nnorm - mpsa) %>% ggplot(aes(time2,nnorm,col= event_label))+
+  geom_line()
+
+
+stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% filter(between(time2,-0.01,0.05)) %>%
+  group_by(event_label,time2, cluster_id2)  %>%  mutate(rate = (sum(event_count)/n_trials)) %>% group_by(event_label,time2) %>% summarise(nnorm = sum(rate) / n_distinct(cluster_id2)) %>% mutate(pp = ifelse(time2 > 0,'post','pre'))  %>% left_join( x = ., y = {.}%>% group_by(pp, event_label)%>% summarise( mpsa = mean(nnorm)) %>% ungroup() %>%  filter(pp == 'pre') %>% select(!pp)) %>% mutate(nnorm = nnorm - mpsa) %>% ggplot(aes(time2,nnorm,col= event_label))+
+  geom_line()
+
+stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% 
+  group_by(time2,event_label) %>% summarise( n= sum(event_count), nnorm =n/n_trials) %>% ungroup() %>% distinct() %>% group_by(time2,event_label) %>% summarise(nnorm = mean(nnorm)) %>% mutate(pp = ifelse(time2 > 0,'post','pre')) %>% group_by(pp, event_label) %>% summarise( mpsa = mean(nnorm))
+
+```
+
+```{r}
+
+ord <- Trialless  %>% filter(between(time2,0,0.05)) %>% group_by(cluster_id2)  %>%
+      filter(event_label == 'Airpuff') %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+
+  
+  
+  
+  
+  # z score and filter
+  g1 <- Trialless  %>% filter(between(time2,-1,1)) %>% select(event_label,cluster_id2,Zscore,time2)
+  
+
+  
+  #apply order 
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+  
+  #heatmap
+  map <-g1 %>% ggplot(aes(time2,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_wrap(~event_label,scales = 'free')+
+    scale_fill_gradient2(low = 'dark
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    labs(fill='Z- scored FR') 
+  
+  
+  #activity across all units
+  smo <- g1 %>% group_by(event_label,time2) %>% summarise(  rate3 = sum(Zscore) / n_distinct(cluster_id2), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(time2,rate3))+
+    geom_line()+
+    geom_smooth(method = 'loess', span =0.05)+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_wrap(~event_label)+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  # arrange plots
+  plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+```
+
+```{r}
+Data
+
+stat2 <- Data %>% mutate(event_count=1)  %>% mutate(time_from_airpuff = time_from_event*1000) %>% mutate(time2 = round(time_from_airpuff)) %>% group_by(time2, cluster_id2,event_label) %>% 
+    mutate(rate = (sum(event_count)/n_trials), rate = rate/0.001) %>% ungroup() %>% 
+    distinct(time2, cluster_id2,id,event_label,rate) %>% ungroup()  %>% left_join( {.} %>% filter(time2<0,) %>% group_by(cluster_id2)%>% summarise( Zmean = mean(rate))) %>% group_by(event_label,cluster_id2) %>% 
+    mutate(sd_rate = sd(rate)) %>% 
+    mutate(Zscore = ifelse(sd_rate == 0, 0, (rate - Zmean) / sd_rate)) %>% 
+    na.omit()  %>% left_join( {.} %>% filter(time2<0,) %>% group_by(event_label) %>% summarise(maps = mean(Zscore))) %>% mutate(Zscore = Zscore - maps)
+    
+
+Trialess <- Trialless %>% ungroup
+
+moddata <- Trialess %>% mutate(Zscore = (Zscore- min(Zscore)+1))
+
+stat2 %>% ggplot(aes(Zscore,fill=event_label))+
+  geom_histogram()
+
+stat %>% ggplot(aes(time2,event_count,col = event_label))+
+  geom_smooth()
+
+stat %>% group_by(event_label,time2 ) %>% summarise( fr = mean(event_count)) %>% ggplot(aes(time2,fr, col = event_label))+
+  geom_line()
+
+stat2 %>% group_by(event_label) %>% summarise(min(Zmean))
+
+mo <- lme4::glmer(data = moddata, Zscore ~ event~Label)
+```
+
+```{r}
+Trialless <- Data %>% mutate(time_from_event = time_from_event) %>% mutate(time2 = round(time_from_event,3))   %>%  group_by(cluster_id2,time2,event_label,Phase) %>% mutate(event_count = n()) %>% mutate(rate = sum(event_count)/n_trials/0.1) %>% ungroup() %>%  distinct(cluster_id2,time2,event_label,Phase,rate)  %>% group_by(time2,event_label,Phase) %>% mutate(Zscore = rate - mean(rate)/sd(rate)) %>% ungroup() %>% mutate(Zscore = ifelse(is.infinite(Zscore), 0, Zscore),  # Replace -Inf/+Inf with 0
+         Zscore = replace_na(Zscore, 0)) 
+
+
+Trialless <- stat %>% group_by(time2,event_label,Phase,cluster_id2) %>% mutate(rate = sum(event_count)/n_trials/0.1) %>% group_by(time2,event_label,Phase) %>% mutate(mean = mean(rate) , sd= sd(rate), Zscore = rate - mean(rate)/sd(rate)) %>% ungroup() %>% distinct() %>%  mutate(Zscore = ifelse(is.infinite(Zscore), 0, Zscore),  # Replace -Inf/+Inf with 0
+         Zscore = replace_na(Zscore, 0)) 
+
+
+ord <- Trialless %>% filter(Phase=='cortex')  %>% filter(between(time2,0,100)) %>% group_by(cluster_id2)  %>%
+      filter(event_label == 'Airpuff') %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  
+  
+
+  
+Trialless %>% distinct(Phase)
+  # z score and filter
+  g1 <-  Trialless  %>% filter(event_label %in% c('Airpuff','Opto_air','justOpto')) %>% filter(between(time2,-1,1)) %>% select(Phase,event_label,Zscore,time2)
+  g1 <- g1 %>% group_by(Phase) %>% complete(event_label,nesting(time2), fill = list(Zscore = 0.1)) %>% filter(Phase != 'NA')
+  g1 <- g1 %>% mutate(event_label = case_when(
+    event_label == 'justOpto' ~ 'Opto_only',
+    event_label == 'Opto_air' ~'Airpuff + Opto',
+    event_label == 'Airpuff' ~ 'Airpuff',
+    .default = 'WTF'
+  ))%>% mutate(newf = case_when(
+    event_label == 'Airpuff' ~ 'Airpuff',
+     event_label == 'Airpuff + Opto' & Phase == 'cortex' ~ 'Airpuff+S1_stim',
+     event_label == 'Airpuff + Opto' & Phase == 'Thalamus' ~ 'Airpuff+PO_stim',
+    event_label == 'Opto_only' & Phase == 'cortex' ~ 'S1_stim',
+     event_label == 'Opto_only' & Phase == 'Thalamus' ~ 'PO_stim',
+    .default = 'UFF')) %>% ungroup()
+  
+  g1 %>%  distinct(newf)
+  
+
+summs2 <- g1  %>% mutate(time2 = time2*1000) %>%  filter(between(time2,-20,250)) %>%  group_by(newf,time2) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) 
+
+summs2 %>% ggplot()+
+  geom_line(aes(time2,rate3, col=newf))
+
+g1 %>% filter(newf == 'S1_stim')
+
+Trialless %>% filter(Phase =='cortex' & event_label=='justOpto') 
+
+
+ stat %>% group_by(time2,event_label,Phase,cluster_id2) %>% mutate(rate = sum(event_count)/n_trials/0.1)  %>% mutate(Zscore = rate - mean(rate)/sd(rate)) %>% ungroup() %>% distinct()
+ 
+ 
+ Data%>% mutate(event_label = case_when(
+    event_label == 'justOpto' ~ 'Opto_only',
+    event_label == 'Opto_air' ~'Airpuff + Opto',
+    event_label == 'Airpuff' ~ 'Airpuff',
+    .default = 'WTF'
+  )) %>% mutate(event = 1/n_trials) %>% mutate(newf = case_when(
+    event_label == 'Airpuff' ~ 'Airpuff',
+     event_label == 'Airpuff + Opto' & Phase == 'cortex' ~ 'Airpuff+S1_stim',
+     event_label == 'Airpuff + Opto' & Phase == 'Thalamus' ~ 'Airpuff+PO_stim',
+    event_label == 'Opto_only' & Phase == 'cortex' ~ 'S1_stim',
+     event_label == 'Opto_only' & Phase == 'Thalamus' ~ 'PO_stim',
+    .default = 'UFF')) %>% ungroup() %>% mutate(time2 = round(time_from_event,3)) %>% group_by(time2,newf) %>% summarise( m = mean(event)) %>%  ggplot(aes(time2,m,col=newf))+
+   geom_line()
+ 
+ Data %>%  filter(Phase =='cortex' & event_label=='justOpto') 
+ 
+ Data%>% mutate(event_label = case_when(
+    event_label == 'justOpto' ~ 'Opto_only',
+    event_label == 'Opto_air' ~'Airpuff + Opto',
+    event_label == 'Airpuff' ~ 'Airpuff',
+    .default = 'WTF'
+  )) %>% mutate(event = 1/n_trials) %>% mutate(newf = case_when(
+    event_label == 'Airpuff' ~ 'Airpuff',
+     event_label == 'Airpuff + Opto' & Phase == 'cortex' ~ 'Airpuff+S1_stim',
+     event_label == 'Airpuff + Opto' & Phase == 'Thalamus' ~ 'Airpuff+PO_stim',
+    event_label == 'Opto_only' & Phase == 'cortex' ~ 'S1_stim',
+     event_label == 'Opto_only' & Phase == 'Thalamus' ~ 'PO_stim',
+    .default = 'UFF')) %>% ungroup() %>% filter(newf =='S1_stim')
+```
+

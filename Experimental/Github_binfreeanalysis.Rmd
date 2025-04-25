@@ -1,0 +1,429 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-12-18"
+---
+# Load Data
+```{r}
+library(tidyverse)
+
+datapath = "E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/binfreeData"
+metapath = "E:/Florian_paper/Florian/Aligned_Data/Analysable_data/meta"
+depthpath = "E:/Florian_paper/Florian/Aligned_Data/Analysable_data/depths"
+ list_of_data <- list.files(path = datapath,
+                             pattern = "\\.csv$",
+                             full.names = TRUE)
+  Data <- read_csv(list_of_data, id = 'group')
+  Data <- Data %>% mutate(id = str_extract(Data$group, "M\\d+_\\d+"))
+  
+  list_of_meta <- list.files(path = metapath,
+                             pattern = "\\.tsv$",
+                             full.names = TRUE)
+  meta <- read_tsv(list_of_meta, id = 'id2') %>%  as_tibble()%>% select(id2,cluster_id,n_spikes,depth,group,fr)
+  meta <- meta %>% mutate(id = str_extract(meta$id2, "M\\d+_\\d+"))
+  meta <- meta %>% filter(id %in% (Data %>% pull(id)))
+  Data <- Data %>% select(cluster_id,seconds,Trial,time_from_airpuff,id) %>% left_join(meta %>% select(!id2),by = join_by(id,cluster_id))
+  Data <- Data %>% mutate(Trial = sprintf('%03d',Trial)) %>% filter(group!='noise')
+  Data <- Data %>% unite('Trial2',c(id,Trial),remove=F) %>%  unite('cluster_id2',c(cluster_id,id),remove=F) %>% left_join(Data %>% group_by(id) %>% distinct(Trial) %>% summarise(n_trials = n())) 
+  
+  
+  list_of_depth <- list.files(path = depthpath,
+                              pattern = "\\.csv$",
+                              full.names = TRUE)
+  depth <- read_csv(list_of_depth, id = 'id',col_names = F)
+  depth <- depth %>% mutate(id = str_extract(depth$id, "M\\d+_\\d+")) %>% rename('surface'=X1)
+  
+  
+  Data <- Data %>% separate_wider_delim(cluster_id2, delim ='_', names = c('del', 'Mouse','Day'), cols_remove = F) %>% unite('id', c(Mouse,Day)) %>%
+    select(!del) %>% 
+    left_join(depth) %>%  
+    mutate(dist_surf = surface - depth) %>% 
+    mutate(Layer_fine = case_when(
+      between(dist_surf,-500,-20) ~ 'out',
+      between(dist_surf,-20,50) ~ 'L1',
+      between(dist_surf,50,500) ~ 'L2/3',
+      between(dist_surf,500,750) ~ 'L5A',
+      between(dist_surf,750,1050) ~ 'L5B',
+      between(dist_surf,1050,1210) ~ 'L6',
+      .default = "WTF"
+    )) %>% 
+    mutate(Layer= case_when(
+    between(dist_surf,-500,-20) ~ 'out',
+    between(dist_surf,-20,500) ~ 'L2/3',
+    between(dist_surf,500,1210) ~ 'L5',
+    .default = "WTF"
+  ))
+  
+  Data
+
+```
+# Plots
+
+```{r}
+Data %>% mutate(event =1) %>% group_by(cluster_id2,id,time_from_airpuff)
+
+Data %>% mutate(time_from_airpuff = time_from_airpuff*1000) %>% mutate(time2 = round(time_from_airpuff))  %>% filter(Layer %in% c('L5','L2/3'))%>%  group_by(Layer,cluster_id2,time2) %>% mutate(event_count = n()) %>% ungroup() %>%  distinct(cluster_id2,time2,depth,id,n_trials,event_count,dist_surf,Layer_fine,Layer)
+
+stat2 <- Data %>% mutate(event_count=1)  %>% mutate(time_from_airpuff = time_from_airpuff*1000) %>% mutate(time2 = round(time_from_airpuff)) %>% filter(Layer %in% c('L5','L2/3')) %>% group_by(time2, cluster_id2) %>% 
+    mutate(rate = (sum(event_count)/n_trials), rate = rate/0.001) %>% ungroup() %>% 
+    distinct(time2, cluster_id2,id,Layer,rate) %>% group_by(Layer,cluster_id2) %>% left_join( {.} %>% filter(time2<0,) %>% group_by(cluster_id2)%>% summarise( Zmean = mean(rate))) %>% 
+    mutate(Zscore = (rate - Zmean)/sd(rate))
+
+
+Data %>% mutate(pp = ifelse(time_from_airpuff<0,'pre','post')) %>% left_join(Data %>% mutate(pp = ifelse(time_from_airpuff<0,'pre','post')) %>% filter(pp =='pre') %>% group_by(cluster_id2) %>% summarise(mean()))
+
+stat2 %>% group_by(time2,Layer) %>% replace_na(list(Zscore=0)) %>% summarise(mZscore = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% filter(between(time2,-10,80)) %>% ggplot(aes(time2,mZscore))+
+  geom_smooth(aes(col=Layer,fill=Layer),span=0.07)
+
+
+  
+  stat2 %>% group_by(time2,Layer) %>% replace_na(list(Zscore=0)) %>% summarise(mZscore = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% filter(between(time2,-10,70)) %>% ggplot(aes(time2,mZscore))+
+  geom_line(aes(col=Layer))+
+  geom_ribbon(aes(ymin= mZscore-se, ymax=mZscore+se,fill=Layer),alpha=0.2)+
+    theme_minimal()+
+    xlab('time from Airpuff [ms]')+
+    ylab('Z-score')+
+    theme(
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20),
+          legend.text = element_text(size = 14),
+          legend.title = element_text(size = 16))+
+    coord_fixed(ratio=7)
+
+  ggsave('C:/users/Freitag/Desktop/Layer_zoom1_v2.tiff', bg= 'white',dpi=900)
+  
+  
+  
+   stat2 %>% group_by(time2,Layer) %>% replace_na(list(Zscore=0)) %>% summarise(mZscore = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% filter(between(time2,-1,25)) %>% ggplot(aes(time2,mZscore))+
+  geom_line(aes(col=Layer))+
+  geom_ribbon(aes(ymin= mZscore-se, ymax=mZscore+se,fill=Layer),alpha=0.2)+
+    theme_minimal()+
+    xlab('time from Airpuff [ms]')+
+    ylab('Z-score')+
+      theme(
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20),
+          legend.text = element_text(size = 14),
+          legend.title = element_text(size = 16))+
+    coord_fixed(ratio=2.33)
+    ggsave('C:/users/Freitag/Desktop/Layer_zoom2_v2.tiff', bg= 'white',dpi=900)
+
+
+?replace_na
+
+sd(c(3,2,1,4,-2))
+
+wtf <-stat2 %>% group_by(time2,Layer) %>% replace_na(list(Zscore=0)) 
+```
+
+
+
+
+#Testing latency and peak response differences between Layers
+```{r}
+
+# probelmatic because if i want to know the FR for each unit in each Trial in each small time bin it will moslty be zero. averaging over Trials assumes unifomrity of responses and averaging over units removes depth information. 
+stat <- Data %>% mutate(time_from_airpuff = time_from_airpuff*1000) %>% mutate(time2 = round(time_from_airpuff)) %>% filter(between(time2,1,150))  %>% filter(Layer %in% c('L5','L2/3'))%>%  group_by(Layer,cluster_id2,time2) %>% mutate(event_count = n()) %>% ungroup() %>%  distinct(cluster_id2,time2,depth,id,n_trials,event_count,dist_surf,Layer_fine,Layer) %>% group_by(cluster_id2,Layer) %>% slice_max(event_count, with_ties = F)  
+
+stat2 <- Data %>% mutate(event_count=1)  %>% mutate(time_from_airpuff = time_from_airpuff*1000) %>% mutate(time2 = round(time_from_airpuff)) %>% filter(Layer %in% c('L5','L2/3'))  %>% group_by(time2, cluster_id2) %>% 
+    mutate(rate = (sum(event_count)/n_trials), rate = rate/0.001) %>% ungroup() %>% 
+    distinct(time2, cluster_id2,id,Layer,rate) %>% group_by(Layer,cluster_id2) %>% left_join( {.} %>% filter(time2<0,) %>% group_by(cluster_id2)%>% summarise( Zmean = mean(rate))) %>% 
+    mutate(Zscore = (rate - Zmean)/sd(rate)) %>%  filter(between(time2,10,40))
+
+stat_Z_org<- Data %>% mutate(event_count=1)  %>% mutate(time_from_airpuff = time_from_airpuff*1000) %>% mutate(time2 = round(time_from_airpuff)) %>% filter(Layer %in% c('L5','L2/3')) %>% group_by(time2, cluster_id2) %>% 
+    mutate(rate = (sum(event_count)/n_trials), rate = rate/0.001) %>% ungroup() %>% 
+    distinct(time2, cluster_id2,id,Layer,rate) %>% group_by(Layer,cluster_id2) %>% left_join( {.} %>% filter(time2<0,) %>% group_by(cluster_id2)%>% summarise( Zmean = mean(rate))) %>% 
+    mutate(Zscore = (rate - Zmean)/sd(rate)) %>% ungroup() %>% filter(between(time2,10,40)) %>%  group_by(Layer,cluster_id2) %>% slice_max(Zscore) %>% ungroup() %>% na.omit()
+
+stat_Z <- stat_Z_org %>%  mutate(Zscore = Zscore - min(Zscore) +1)  %>% mutate(across(c(Layer,id), as.factor))
+
+
+
+range(stat_Z$Zscore)
+
+stat_Z_org
+
+
+modd <- lme4::glmer(data = stat2 %>% filter(between(time2,10,40)), time2~Layer +(1|id), family =Gamma(link = 'inverse'))
+modZ <- lme4::glmer(data = stat_Z %>% filter(between(time2,10,40)), Zscore~Layer +(1|id), family =Gamma(link = 'inverse'))
+DHARMa::simulateResiduals(fittedModel = modd, plot = T,refit=F)
+
+pairs(emmeans::emmeans(modd,'Layer'),adjust ='Tukey')
+
+emmeans_results <- emmeans::emmeans(modd, ~ Layer, type = "response")
+plot(emmeans_results)
+pairs(regrid(emmeans_results), reverse = F)
+pairs(emmeans_results)
+
+library(emmeans)
+
+
+peaktime <- emmeans(modd,  pairwise ~ Layer, type = "response")$contrast %>% as_tibble()
+emmeans_peaktime <- emmeans::emmeans(modd, ~ Layer, type = "response")
+peaktime_p <- emmeans::emmeans(modd, pairwise ~ Layer)
+# Convert to tibble
+pdata <- emmeans_peaktime %>% as_tibble() 
+pdata <- pdata %>% mutate(Layer = trimws(as.character(Layer)))
+
+# Prepare p-values
+pvals <- peaktime_p$contrasts %>%
+  as_tibble() %>%
+  separate_wider_delim(contrast, names = c("group1", "group2"), delim = "-") %>%
+  mutate(psig = case_when(
+    p.value < 0.001 ~'***',
+    p.value < 0.01 ~'**',
+    p.value < 0.05 ~'*',
+     p.value > 0.05  ~'NS',
+  )) %>% mutate( group1 = 'L2/3')%>%
+  mutate(group1 = as.character(group1), group2 = as.character(group2))  %>% mutate(group1 = trimws(group1), group2 = trimws(group2)) %>%  # Ensure character type
+  left_join(pdata %>% mutate(Layer = as.character(Layer)), 
+            by = join_by(group1 ==Layer)) %>%  # Join with corrected types
+  mutate(y.position = asymp.UCL + 0.5)
+# Plot
+ggplot(pdata, aes(x = Layer, y = response)) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  geom_point()+
+  geom_text(aes(label = round(response, 2)), hjust = -1) +
+  theme_minimal()+
+  ylab('Time to peak response')+
+  ggpubr::stat_pvalue_manual(pvals, label = "psig", 
+                             xmin = "group1", xmax = "group2", y.position = "y.position")+
+  coord_fixed(ratio=1)
+ggsave('C:/Users/Freitag/Desktop/pvals_peak_latency.tiff', bg='white',dpi=900)
+
+
+
+
+modZ <- lme4::glmer(data = stat_Z , Zscore~Layer +(1|id), family =Gamma(link = 'inverse'))
+DHARMa::simulateResiduals(fittedModel = modZ, plot = T,refit=F,use.u = T)
+peakamp <- emmeans(modZ,  pairwise ~ Layer, type = "response")$contrast %>% as_tibble()
+emmeans_peaktime <- emmeans::emmeans(modZ, ~ Layer, type = "response")
+peaktime_p <- emmeans::emmeans(modZ, pairwise ~ Layer)
+pdata <- emmeans_peaktime %>% as_tibble() 
+pdata <- pdata %>% mutate(Layer = trimws(as.character(Layer)))
+
+# Prepare p-values
+pvals <- peaktime_p$contrasts %>%
+  as_tibble() %>%
+  separate_wider_delim(contrast, names = c("group1", "group2"), delim = "-") %>%
+  mutate(psig = case_when(
+    p.value < 0.001 ~'***',
+    p.value < 0.01 ~'**',
+    p.value < 0.05 ~'*',
+     p.value > 0.05  ~'NS',
+  )) %>% mutate( group1 = 'L2/3')%>%
+  mutate(group1 = as.character(group1), group2 = as.character(group2))  %>% mutate(group1 = trimws(group1), group2 = trimws(group2)) %>%  # Ensure character type
+  left_join(pdata %>% mutate(Layer = as.character(Layer)), 
+            by = join_by(group1 ==Layer)) %>%  # Join with corrected types
+  mutate(y.position = asymp.UCL + 0.5)
+# Plot
+
+
+ggplot(pdata  %>% mutate(response = response + min(stat_Z_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(stat_Z_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(stat_Z_org$Zscore)-1), aes(x = Layer, y = response)) +
+geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2,  linewidth =1.3) +
+  geom_point()+
+ geom_text(aes(label = round(response, 2)), hjust = -0.5,size=5) +
+  theme_minimal()+
+  ylab('max Zscore response')+
+  ggpubr::stat_pvalue_manual(pvals %>% mutate(response = response + min(stat_Z_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(stat_Z_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(stat_Z_org$Zscore)-1, y.position = asymp.UCL + 0.3), label = "psig", xmin = "group1", xmax = "group2", y.position = "y.position", size=8,bracket.size=1)+
+  coord_fixed(ratio=0.4)+
+  ylim(3,6.5)
+ggsave('C:/users/Freitag/Desktop/Layer_maxamp.tiff', bg= 'white',dpi=900)
+
+
+stat_Z_org %>% group_by(Layer,time2) %>% summarise(mf = mean(Zscore)) %>% group_by(Layer) %>% summarise(maxx = max (mf))
+
+ stat2 %>% group_by(time2,Layer) %>% replace_na(list(Zscore=0)) %>% summarise(mZscore = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% group_by(Layer) %>% summarise(maxx = max (mZscore)) %>% mutate(norm_to_L2 = maxx/max(maxx), perc_chnage = -(1-norm_to_L2) *100)
+ 
+ peaktime
+ peakamp
+ 
+ 
+ 
+ 
+emmeans::emmeans(mod3, pairwise~ Layer , type = "response",weights = "proportional")
+
+emmeans::emmeans(mod3, pairwise~ Layer |Behv, type = "response")
+```
+
+# Measure response onset
+```{r}
+# This might be to complex to solve with the time conrtrains right now.
+onset <-stat2 %>% filter(between(time2,0,25))
+
+# 2 peaks one at 10, other later
+onset %>% ggplot(aes(time2,Zscore,col = Layer))+
+  geom_smooth(method = 'loess', span =0.1)+
+  theme(legend.position="none")+
+  geom_vline(xintercept = 7)+
+   geom_vline(xintercept = 13)+
+   geom_vline(xintercept = 20)
+ggsave('C:/Users/Freitag/Desktop/2_peaks.tiff', bg='white')
+
+#single unit splots
+selected_ids <- sample(onset$cluster_id2,6)
+filtered_data <- onset %>% filter(cluster_id2 %in% selected_ids)
+
+# Plot, faceted by ID
+filtered_data  %>% ggplot( aes(time2,Zscore)) +
+  geom_smooth(span=0.5) +
+  geom_line()+
+  geom_hline(aes(yintercept = 2))+
+  geom_point() +
+  facet_wrap(~ cluster_id2, scales = "free") +
+  ggtitle("Plots for Selected IDs") +
+  theme_minimal()
+
+Data
+# late rise
+temp_late <- onset %>% filter(between(time2,13,25))  %>% left_join(Data %>% filter(between(time_from_airpuff,0.012,0.025)) %>% group_by(cluster_id2) %>% count()) %>%  ungroup() %>% filter(n > median(n)) %>% pluck('cluster_id2')
+onset_late <- onset%>% filter(between(time2,13,25)) %>% filter(cluster_id2 %in% temp_late)
+
+
+
+stat3_late <- onset_late %>% group_by(cluster_id2) %>% filter(Zscore >1.0) %>% slice_min(time2, with_ties = F)
+mot_late <- lme4::lmer(data = stat3_late,time2~Layer + (1|id))
+DHARMa::simulateResiduals(fittedModel = mot_late, plot = T,refit=F)
+pairs(emmeans::emmeans(mot_late,'Layer'),adjust ='Tukey')
+timetorise <- emmeans(mot_late,  pairwise ~ Layer, type = "response")$contrast %>% as_tibble()
+stat3_late %>% ggplot(aes(time2,fill= Layer))+
+  geom_histogram()
+
+
+
+
+emmeans_peaktime <- emmeans::emmeans(mot_late, ~ Layer, type = "response")
+peaktime_p <- emmeans::emmeans(mot_late, pairwise ~ Layer)
+#plot
+
+pdata <- emmeans_peaktime %>% as_tibble() 
+pdata <- pdata %>% mutate(Layer = trimws(as.character(Layer)))
+
+# Prepare p-values
+pvals <- peaktime_p$contrasts %>%
+  as_tibble() %>%
+  separate_wider_delim(contrast, names = c("group1", "group2"), delim = "-") %>%
+  mutate(psig = case_when(
+    p.value < 0.001 ~'***',
+    p.value < 0.01 ~'**',
+    p.value < 0.05 ~'*',
+     p.value > 0.05  ~'NS',
+  )) %>% mutate( group1 = 'L2/3')%>%
+  mutate(group1 = as.character(group1), group2 = as.character(group2))  %>% mutate(group1 = trimws(group1), group2 = trimws(group2)) %>%  # Ensure character type
+  left_join(pdata %>% mutate(Layer = as.character(Layer)), 
+            by = join_by(group1 ==Layer)) %>%  # Join with corrected types
+  mutate(y.position = upper.CL + 0.5)
+# Plot
+ggplot(pdata, aes(x = Layer, y = emmean)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_point()+
+  geom_text(aes(label = round(emmean, 2)), hjust = -1) +
+  theme_minimal()+
+  ylab('time')+
+  ggpubr::stat_pvalue_manual(pvals, label = "psig", 
+                             xmin = "group1", xmax = "group2", y.position = "y.position")+
+    coord_fixed(ratio=1)
+ggsave('C:/Users/Freitag/Desktop/pvals_latepeak.tiff', bg='white')
+
+
+
+#early peak
+temp_early <- onset %>% filter(between(time2,7,13))  %>% left_join(Data %>% filter(between(time_from_airpuff,0.012,0.025)) %>% group_by(cluster_id2) %>% count()) %>%  ungroup() %>% na.omit() %>%  filter(n > median(n))
+onset_early <- onset%>% filter(between(time2,7,13)) %>% filter(cluster_id2 %in% temp_early$cluster_id2)
+
+
+stat3_early <- onset_early %>% group_by(cluster_id2)  %>% slice_max(Zscore, with_ties = F) %>% ungroup
+mot_early <- lme4::lmer(data = stat3_early,time2~Layer + (1|id))
+DHARMa::simulateResiduals(fittedModel = mot_early, plot = T,refit=F)
+pairs(emmeans::emmeans(mot_early,'Layer'),adjust ='Tukey')
+
+stat3_early %>% ggplot(aes(time2))+
+  geom_histogram(aes(fill = Layer))+
+  geom_vline(data = stat3_early %>% filter(Layer == 'L5'), aes(xintercept = mean(time2)))+
+  geom_vline(data = stat3_early %>% filter(Layer == 'L2/3'), aes(xintercept = mean(time2)))
+
+
+
+
+
+emmeans_peaktime <- emmeans::emmeans(mot_early, ~ Layer, type = "response")
+peaktime_p <- emmeans::emmeans(mot_early, pairwise ~ Layer)
+#plot
+
+pdata <- emmeans_peaktime %>% as_tibble() 
+pdata <- pdata %>% mutate(Layer = trimws(as.character(Layer)))
+
+# Prepare p-values
+pvals <- peaktime_p$contrasts %>%
+  as_tibble() %>%
+  separate_wider_delim(contrast, names = c("group1", "group2"), delim = "-") %>%
+  mutate(psig = case_when(
+    p.value < 0.001 ~'***',
+    p.value < 0.01 ~'**',
+    p.value < 0.05 ~'*',
+     p.value > 0.05  ~'NS',
+  )) %>% mutate( group1 = 'L2/3')%>%
+  mutate(group1 = as.character(group1), group2 = as.character(group2))  %>% mutate(group1 = trimws(group1), group2 = trimws(group2)) %>%  # Ensure character type
+  left_join(pdata %>% mutate(Layer = as.character(Layer)), 
+            by = join_by(group1 ==Layer)) %>%  # Join with corrected types
+  mutate(y.position = upper.CL + 0.5)
+# Plot
+ggplot(pdata, aes(x = Layer, y = emmean)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_point()+
+  geom_text(aes(label = round(emmean, 2)), hjust = -1) +
+  theme_minimal()+
+  ylab('Time')+
+  ggpubr::stat_pvalue_manual(pvals, label = "psig", 
+                             xmin = "group1", xmax = "group2", y.position = "y.position")
+ggsave('C:/Users/Freitag/Desktop/pvals_earlypeak.tiff', bg='white')
+
+timetorise
+```
+
+# visualisation of average onset latency
+```{r}
+Zoom <- Data %>% mutate(time_from_airpuff = time_from_airpuff*1000) %>% mutate(time2 = round(time_from_airpuff)) %>% 
+  filter(Layer %in% c('L5','L2/3')) %>% group_by(Layer) %>% mutate(nunits = n_distinct(cluster_id2)) %>% ungroup() %>% group_by(time2,Layer) %>% summarise(n=n()/nunits) %>% distinct(time2,Layer,n)
+ 
+
+Zoom  %>%  filter(between(time2,-50,150)) %>% ggplot(aes(time2,n,col=Layer))+
+  geom_line()
+ 
+
+Zoom  %>%  filter(between(time2,-20,45)) %>% ggplot(aes(time2,n,col=Layer))+
+  geom_line()
+
+
+Zoom  %>%  filter(between(time2,-5,20)) %>% ggplot(aes(time2,n,col=Layer))+
+  geom_line()
+
+
+
+```
+
+#10 ms binned data vs 1 ms bin data
+```{r}
+Trialless2 <- read_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Trialless.csv")
+Trialless2 <- Trialless %>% filter(id %in% Data$id) %>% filter(Behv == 'A2L')
+
+
+g2 <- Trialless2 %>% filter(between(rel_time,-0.02,0.05)) %>% select(Behv,cluster_id2,Zscore,rel_time,rate,Layer)
+  
+g2 %>% group_by(rel_time,Layer) %>% summarise( rate3 = mean(rate), sd = sd(rate), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3,col = Layer))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    theme_minimal()
+
+Data %>% mutate(time_from_airpuff = time_from_airpuff*1000) %>%  filter(between(time_from_airpuff,-20,50)) %>% mutate(time2 = round(time_from_airpuff)) %>% 
+group_by(time2,Layer) %>% summarise(n=n()) %>% ggplot(aes(time2,n,col =Layer))+
+  geom_line()+
+  geom_smooth(method = 'loess', span = 0.1)
+
+
+
+
+ 
+```
+
