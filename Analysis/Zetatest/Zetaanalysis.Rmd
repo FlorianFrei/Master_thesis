@@ -2,12 +2,14 @@
 title: "Zeta_analysis"
 output: html_document
 date: "2024-09-25"
+editor_options: 
+  chunk_output_type: console
 ---
 # load Data
 ```{r}
 library(tidyverse)
 source("E:/Florian_paper/Florian/Github/Master_thesis/Analysis/Analysis/Master_helper.R")
-W2T <- read.csv("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/W2T.csv") %>% mutate(Behv = 'W2T_HIT')
+W2T <- read.csv("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/W2T.csv") %>% mutate(Behv = 'HIT')
 A2L <- read.csv("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/A2L.csv") %>% mutate(Behv = 'A2L')
 PC <- read.csv("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/PC.csv") %>% mutate(Behv = 'PC')
 Whisk <- read.csv("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/Zetatests/Whisk.csv") %>% mutate(Behv = 'Whisk')
@@ -34,7 +36,7 @@ Unit_behv_strict <- Data %>% filter(p_val < 0.05/4) %>%
   group_by(unit) %>%                          # Group by unit
   summarise(Behv_combined = paste(unique(Behv), collapse = "_"))
 
-no_W2T  <- Data %>% filter(!Behv %in% c('W2T_HIT','Whisk')) %>% 
+no_W2T  <- Data %>% filter(!Behv %in% c('HIT','Whisk')) %>% 
   group_by(unit) %>%                          # Group by unit
   summarise(Behv_combined2 = paste(unique(Behv), collapse = "_"))
 
@@ -134,7 +136,7 @@ join <- Unit_Behv %>% left_join(Data %>% mutate(val = 1) %>%  pivot_wider(names_
 
 A2LU <- join  %>% filter(A2L ==1) %>% select(unit)
 PCU <- join  %>% filter(PC ==1) %>% select(unit)
-W2TU <- join  %>% filter(W2T_HIT==1| Whisk==1) %>% select(unit)
+W2TU <- join  %>% filter(HIT==1| Whisk==1) %>% select(unit)
 
 A2L <- Trialless %>% filter(Behv == 'A2L') %>% mutate(res1 = ifelse(cluster_id2 %in% A2LU$unit,1,0))
 PC <- Trialless %>% filter(Behv == 'PC') %>% mutate(res1 = ifelse(cluster_id2 %in% PCU$unit,1,0))
@@ -166,13 +168,17 @@ join <- Unit_Behv_strict %>% left_join(Data  %>% filter(p_val < 0.05/4) %>% muta
 
 A2LU <- join  %>% filter(A2L ==1) %>% select(unit)
 PCU <- join  %>% filter(PC ==1) %>% select(unit)
-W2TU <- join  %>% filter(W2T_HIT==1| Whisk==1) %>% select(unit)
+W2TU <- join  %>% filter(HIT==1| Whisk==1) %>% select(unit)
 
 A2L <- Trialless %>% filter(Behv == 'A2L') %>% mutate(res1 = ifelse(cluster_id2 %in% A2LU$unit,1,0))
 PC <- Trialless %>% filter(Behv == 'PC') %>% mutate(res1 = ifelse(cluster_id2 %in% PCU$unit,1,0))
 W2T <- Trialless %>% filter(Behv == 'W2T') %>% mutate(res1 = ifelse(cluster_id2 %in% W2TU$unit,1,0))
 
-ha <- rbind(A2L,PC,W2T)
+ha <- rbind(A2L,PC,W2T) 
+
+ha <-ha %>% bind_rows(
+    ha %>%
+      mutate(res1 = 2))
 
 ha %>% filter(between(rel_time,-1,1)) %>%  group_by(Behv,,rel_time,res1) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
     geom_line()+
@@ -191,7 +197,58 @@ ha %>% filter(between(rel_time,-1,1)) %>%  group_by(Behv,,rel_time,res1) %>% sum
 
 
 
+ha %>% mutate(res1 = case_when(
+  res1 == 0 ~ 'non responsive',
+  res1 == 1 ~ 'responsive',
+  res1 == 2 ~ 'average'
+  )) %>% filter(between(rel_time,0,0.04)) %>% group_by(Behv,res1,cluster_id2) %>% slice_max(Zscore) %>% group_by(Behv,res1)  %>%  summarise(m = mean(Zscore), sd = sd(Zscore), sem = sd/sqrt(n()),low = quantile(Zscore,0.75),high = quantile(Zscore,0.25)) %>% ggplot(aes(as.factor(res1),m,fill = as.factor(Behv)))+
+  geom_col(position = position_dodge())+
+  geom_errorbar(aes(ymin= m-sem,ymax=m+sem),position = position_dodge())+
+  theme_minimal(base_size = 18)+
+  xlab('Zeta outcome')+
+  ylab('Zscored FR')+
+  guides(fill=guide_legend(title="Task"))+
+  coord_fixed(ratio = 0.6)
+ggsave("C:/Users/Freitag/Desktop/Zeta.tiff", bg= 'white', dpi = 900)
 
+
+
+  
+  
+boot_mean <- function(data, indices) {
+  return(mean(data[indices], na.rm = TRUE))
+}
+
+# Compute bootstrapped CIs
+bootstrap_ci <- ha %>%
+  mutate(res1 = case_when(
+    res1 == 0 ~ 'non responsive',
+    res1 == 1 ~ 'responsive',
+    res1 == 2 ~ 'average'
+  )) %>%
+  filter(between(rel_time, 0, 0.04)) %>%
+  group_by(Behv, res1) %>%
+  summarise(
+    middle = mean(Zscore, na.rm = TRUE),  # Calculate mean before summarising
+    boot_results = list(boot(Zscore, boot_mean, R = 1000)),  # Store boot object as list
+    .groups = "drop"
+  ) %>%
+  rowwise() %>%
+  mutate(
+    lower = boot.ci(boot_results, type = "perc")$percent[4],  # 2.5% CI
+    upper = boot.ci(boot_results, type = "perc")$percent[5]   # 97.5% CI
+  ) %>%
+  ungroup() %>%
+  select(-boot_results)  # Remove boot object for clean output
+
+# Plot with geom_pointrange()
+ggplot(bootstrap_ci, aes(x = as.factor(res1), y = middle, color = as.factor(Behv))) +
+  geom_pointrange(aes(ymin = lower, ymax = upper), size = 1.2) +
+  theme_minimal(base_size = 18) +
+  xlab('Zeta outcome') +
+  ylab('Zscored FR') +
+  guides(fill = guide_legend(title = "Task"))
+  coord_cartesian(ylim = c(-3, 6))
 ```
 
 
@@ -220,7 +277,7 @@ join <- Unit_Behv %>% left_join(Data  %>% filter(p_val < 0.05/4) %>% mutate(val 
 Trialless2 <- add_layers(Trialless,depthpath = "E:/Florian_Paper/Florian/Aligned_Data/Analysable_data/depths")  %>% left_join(join, join_by('cluster_id2' == 'unit'))  %>% replace_na(list(W2T_HIT=0, A2L=0, PC=0, Whisk=0))
 
 Zetatrial <- Trialless2 %>% mutate(responsive = case_when(
- Behv =='W2T' & W2T_HIT ==1 ~ 1,
+ Behv =='W2T' & HIT ==1 ~ 1,
  Behv =='W2T' & Whisk ==1 ~ 1,
  Behv =='A2L' & A2L ==1 ~ 1,
  Behv =='PC' & PC ==1 ~ 1,
@@ -274,3 +331,104 @@ see <- Zetatrial %>% select(p_val,responsive) %>% distinct() %>% arrange(-p_val)
 
 0.05/4
 ```
+
+
+
+```{r}
+Unit_Behv_strict
+
+Data %>% group_by(unit) %>% count() %>% group_by(n) %>% count()
+
+Unit_Behv_strict %>% mutate(Behv_count = str_count(Behv_combined, "_") + 1) %>% group_by(Behv_combined) %>% mutate(num = n()) %>% ggplot(aes(Behv_count,num,fill = Behv_combined))+
+  geom_col()
+
+
+Unit_Behv_strict %>% mutate(Behv_count = str_count(Behv_combined, "_") + 1) %>% group_by(Behv_combined) %>% mutate(num = n()) %>% distinct(Behv_combined,Behv_count,num) %>% ggplot(aes(Behv_count,num,fill = Behv_combined))+
+  geom_col()+
+  theme_minimal()
+
+ Unit_Behv_strict %>% mutate(Behv_count = str_count(Behv_combined, "_") + 1) %>% group_by(Behv_combined) %>% mutate(num = n()) %>% distinct(Behv_combined,Behv_count,num) %>% arrange(Behv_count) %>% ungroup() %>%  mutate(Behv_combined = fct_reorder(Behv_combined, Behv_count))  %>% ggplot(aes(Behv_count,num,fill = Behv_combined))+
+  geom_col()+
+  theme_minimal()
+ 
+ 
+ library(ggsci)
+
+Unit_Behv_strict %>% mutate(Behv_count = str_count(Behv_combined, "_") + 1) %>% group_by(Behv_combined) %>% mutate(num = n()) %>% distinct(Behv_combined,Behv_count,num) %>% arrange(Behv_count) %>% ungroup() %>%  mutate(Behv_combined = fct_reorder(Behv_combined, Behv_count))  %>% ggplot(aes(Behv_combined,num))+
+  geom_col()+
+  facet_grid(~Behv_count, scales='free', space='free')+
+  theme_bw()+
+  theme( axis.text.x = element_text(angle=90))
+   scale_fill_brewer(palette = "Set3") 
+   scale_fill_viridis_d(option = "C", begin = 0.1, end = 0.9)   # Options: scale_fill_jco(), scale_fill_lancet(), etc.
+?element_text
+
+Unit_Behv_strict %>% mutate(Behv_count = str_count(Behv_combined, "_") + 1) %>% group_by(Behv_combined) %>% mutate(num = n()) %>% distinct(Behv_combined,Behv_count,num) %>% arrange(Behv_count) %>% ungroup() %>%  mutate(Behv_combined = fct_reorder(Behv_combined, Behv_count)) 
+
+
+
+
+
+
+
+
+Data %>% group_by(unit) %>% summarise(Behv_combined = paste(unique(Behv), collapse = "_")) %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / Trialless %>% summarise(nmax = n_distinct(cluster_id2)) %>% pull(nmax))*100) %>% ggplot(aes(x="", y=n, fill=Behv_combined)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void()
+
+
+  
+  
+  Data %>% group_by(unit) %>% summarise(Behv_combined = paste(unique(Behv), collapse = "_")) %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / Trialless %>% summarise(nmax = n_distinct(cluster_id2)) %>% pull(nmax))*100) %>% mutate(newcat = ifelse(perc < 4, 'other',Behv_combined)) %>% mutate(newcat = as.factor(newcat)) %>% group_by(newcat) %>% summarise(n = sum(n)) %>% ggplot(aes(x="", y=n, fill=newcat)) +
+  geom_bar(stat="identity", width=1, color="white")+
+  coord_polar("y", start=0) +
+  theme_void()
+  
+  a<- Unit_Behv_strict %>% count(Behv_combined,sort=T) %>% mutate(perc = (n / Trialless %>% summarise(nmax = n_distinct(cluster_id2)) %>% pull(nmax))*100) %>% mutate(newcat = ifelse(perc < 2, 'other',Behv_combined)) %>% mutate(newcat = as.factor(newcat)) 
+  a %>% rbind(tibble(Behv_combined='non responsive', n= a %>% summarise(p = sum(perc),n = sum(n)) %>% mutate(n2 = n*100/p - n) %>% pull(n2),perc= 100 - a %>% summarise(p = sum(perc)) %>% pull(p),newcat= 'non responsive')) %>% group_by(newcat) %>% summarise(n = sum(n)) %>% ggplot(aes(x="", y=n, fill=newcat)) +
+  geom_bar(stat="identity", width=1, color="white")+
+  coord_polar("y", start=0) +
+  theme_void()
+  
+ b<-  Unit_Behv%>% mutate(Behv_count = str_count(Behv_combined, "_") + 1) %>% group_by(Behv_combined) %>% mutate(num = n()) %>% distinct(Behv_combined,Behv_count,num) %>% arrange(Behv_count) %>% ungroup() %>%  mutate(Behv_combined = fct_reorder(Behv_combined, Behv_count))  %>% mutate(perc = (num / Trialless %>% summarise(nmax = n_distinct(cluster_id2)) %>% pull(nmax))*100)
+  b %>% rbind(tibble(Behv_combined='non responsive',Behv_count=0, num= b %>% summarise(p = sum(perc),n = sum(num)) %>% mutate(n2 = n*100/p - n) %>% pull(n2),perc= 100 - b %>% summarise(p = sum(perc)) %>% pull(p))) %>% ggplot(aes(Behv_combined,num))+
+  geom_col()+
+  facet_grid(~Behv_count, scales='free', space='free')+
+  theme_bw()+
+  theme( axis.text.x = element_text(angle=90))
+```
+#venn diagramm
+```{r}
+
+library(UpSetR)
+
+A <-Data %>% mutate(it = 1) %>% pivot_wider(names_from = Behv, values_from = it) %>% distinct(unit)
+
+Data %>% filter(p_val >0.05)
+
+upd <-Data %>%
+  mutate(it = 1) %>%
+  group_by(unit, Behv) %>%  # Ensure each (Unit, Behv) is unique
+  summarise(it = max(it), .groups = "drop") %>%  # Collapse duplicate rows
+  pivot_wider(names_from = Behv, values_from = it, values_fill = list(it = 0))
+
+upset(upd %>% as.data.frame(), nsets = 6, order.by = "freq", number.angles = 10, point.size = 3.5, line.size = 2, cutoff=5,
+    mainbar.y.label = "Response overlap", sets.x.label = "Units", 
+     text.scale = c(4,3,3,2,4,3))
+
+?upset
+
+upds <-Data %>% filter(p_val < 0.05/4) %>% 
+  mutate(it = 1) %>%
+  group_by(unit, Behv) %>%  # Ensure each (Unit, Behv) is unique
+  summarise(it = max(it), .groups = "drop") %>%  # Collapse duplicate rows
+  pivot_wider(names_from = Behv, values_from = it, values_fill = list(it = 0))
+
+upset(upds %>% as.data.frame(), nsets = 6, order.by = "freq", number.angles = 10, point.size = 3.5, line.size = 2, 
+    mainbar.y.label = "Reaponse overlap", sets.x.label = "Units", 
+    text.scale = c(4,3,4,4))
+
+
+```
+

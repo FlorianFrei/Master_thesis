@@ -21,7 +21,7 @@ source("C:/Users/Freitag/Documents/GitHub/Master_thesis/Analysis/Analysis/Master
 # load data
 ```{r}
 #Data <- data.table::fread("D:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/final_combined_data.csv", showProgress = T)
-#combcont <- data.table::fread("D:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/combcont.csv",showProgress=T)
+#combcont <- data.table::fread("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/combcont.csv",showProgress=T)
 Trialless <- read_csv("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Trialless.csv")
 
 # Zeta <- read_csv("C:/Users/deepl/Desktop/com_Data/wrangled_Data/Unit_Behv.csv")
@@ -40,6 +40,125 @@ Plot_overview(Trialless, orderby_Behv = "A2L", by_time = T, theme_smo = theme_mi
 
 
 plot_overview_perID(Trialless, orderby_Behv = "A2L", save = "E:/Florian/Aligned_Data/Analysable_data/figures/sessions")
+
+
+Plot_overview2 <- function(Trialless,orderby_Behv = 'A2L',by_time = F,theme_smo = theme_minimal()) {
+  if(by_time ==F) {
+    ord <- Trialless  %>% filter(between(rel_time,0,0.1)) %>% group_by(cluster_id2)  %>%
+      filter(Behv == orderby_Behv) %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  }
+  if(by_time ==T){
+    ord <-  Trialless %>% group_by(cluster_id2)  %>%
+      filter(between(rel_time,-1,1)) %>%  filter(Behv == orderby_Behv ) %>% group_by(cluster_id2) %>% 
+      slice_max(Zscore,n=1,with_ties=F) %>% summarise(ord = rel_time) %>%   arrange( ord)  %>% distinct() %>% 
+      mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  }
+  
+  
+  
+  
+  
+  # z score and filter
+  g1 <- Trialless  %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time)
+  
+
+  
+  #apply order 
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+  
+  #heatmap
+  map <-g1 %>% mutate(Zscore= ifelse(Zscore > 8,8,Zscore)) %>%  ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_wrap(~Behv,scales = 'free')+
+    scale_fill_gradientn(colors = c("darkblue",'beige' ,"beige", "red"),
+                       values = scales::rescale(c(min(g1$Zscore), -0.65, 0, 8)),
+                       guide = guide_colorbar(
+                         ticks = FALSE,  # Remove intermediate ticks
+                        draw.ulim = FALSE,     # Remove top tick
+                         draw.llim = FALSE,   
+                        
+                       ),
+                       breaks = c(-2, 8))+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30))+
+    labs(fill='Z- scored FR') 
+  
+  
+  #activity across all units
+  smo <- g1 %>% group_by(Behv,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_wrap(~Behv)+
+    theme_smo+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  # arrange plots
+  plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plot
+  
+}
+
+Plot_overview2(Trialless %>% left_join(Trialless %>% filter(rel_time < 0) %>% group_by(Behv) %>% summarise(bl = mean(Zscore))) %>% ungroup %>% mutate(Zscore = Zscore - bl), orderby_Behv = "A2L", by_time = F, theme_smo = theme_minimal())
+ggsave('C:/users/Freitag/Desktop/Overview_v2.tiff', bg= 'white',dpi=900)
+
+
+Trialless %>% group_by(Behv,rel_time) %>% summarise( rate3 = mean(Zscore))  %>%  filter(between(rel_time,0,0.04))  %>% group_by(Behv) %>% summarise(max= max(rate3), sd = sd(rate3), sem = sd/sqrt(n())) %>% mutate(norm_to_A2L = max / (max(max)), perc_change = -(1-norm_to_A2L) *100)
+
+
+Trialless %>% filter(between(rel_time,0,0.04))  %>% group_by(cluster_id2,Behv) %>% slice_max(Zscore) %>% group_by(Behv) %>% summarise(max = mean(Zscore), sd = sd(Zscore))
+
+ Trialless2 <- combcont %>% group_by(Behv,rel_time, cluster_id2)  %>% 
+  mutate(rate = (sum(event_count)/n_trials), rate = rate/0.01) %>% ungroup() %>% 
+  distinct(Behv,rel_time,cluster_id2,rate,depth,n_spikes,id) %>% group_by(Behv,cluster_id2) %>% 
+  mutate(sd = sd(rate), Zscore = (rate - mean(rate))/sd(rate))
+ 
+Trialless2 %>% filter(between(rel_time,0,0.04))  %>% group_by(Behv,cluster_id2) %>% summarise(max = mean(Zscore), sd = mean(sd)) %>% summarise(sd= mean(sd))
+
+unitless <- combcont %>% group_by(Behv,rel_time, Trial2)  %>% 
+  mutate(rate = (sum(event_count)/n_trials), rate = rate/0.01) %>% ungroup() %>% 
+  distinct(Behv,rel_time,Trial2,rate,depth,n_spikes,id) %>% group_by(Behv,Trial2) %>% 
+  mutate(sd = sd(rate), Zscore = (rate - mean(rate))/sd(rate))
+
+unitless %>% filter(between(rel_time,0,0.04))  %>% group_by(Trial2,Behv) %>% summarise(Zscore = mean(Zscore)) %>% group_by(Behv) %>% summarise(max = mean(Zscore), sd = sd(Zscore))
+
+combcont %>% select(cluster_id2,Trial2,rel_time,event_count,Behv,n_trials)
+
+
+Trialless %>%
+  group_by(Behv, rel_time) %>%
+  summarise(
+    rate3 = mean(Zscore),    # Mean Z-scored firing rate
+    SD_Z = sd(Zscore)        # Standard deviation of Z-scored firing rate
+  ) %>%
+  filter(between(rel_time, 0, 0.04)) %>%
+  group_by(Behv) %>%
+  summarise(
+    max_rate = max(rate3),   # Maximum mean Z-score in time window
+    max_SD = mean(SD_Z)       # Maximum SD in time window
+  )
+
+
+Trialless %>% filter(between(rel_time,0,0.04)) %>% filter(between(Zscore,-3,5)) %>% group_by(Behv,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% slice_max(rate3)
+
+Trialless %>% filter(between(rel_time,0,0.04))  %>% group_by(Behv,rel_time) %>% summarise( rate3 = mean(Zscore), IQR =  IQR(Zscore),MAD_Z <- median(abs(Zscore - median(Zscore)))) %>% slice_max(rate3)
+ IQR(Trialless$Zscore)
+sd(c(1,2,3,1,2,3,1,2,3,400))
+
+
+Trialless %>% filter(between(rel_time,0,0.04)) %>% ggplot(aes(Zscore,fill=Behv))+
+  geom_histogram()
 ```
 
 # Layer plots
@@ -60,9 +179,9 @@ Layerd %>%
   theme_minimal() +
   xlab("time from stimulus") +
   ylab("Z-scored FR")+ 
-  theme(strip.text.x = element_text(size = 25),
-         axis.title=element_text(size=18))
-#ggsave('C:/users/Freitag/Desktop/LayerOV.tiff', bg= 'white',dpi=900)
+  theme(strip.text = element_text(size = 30),
+         axis.title=element_text(size=20),axis.text=element_text(size=12))+coord_fixed(ratio=0.5)
+ggsave('C:/users/Freitag/Desktop/LayerOV_V2.tiff', bg= 'white',dpi=900)
 
 
 
@@ -121,6 +240,10 @@ Layerd %>%
   ggplot() +
   geom_histogram(aes(dist_surf, fill = Layer_fine), binwidth = 20) +
   geom_text(data = labels, aes(x, y, label = n))
+
+
+
+Layerd  %>% filter(Layer %in% c("L2/3", "L5")) %>% group_by(Behv,rel_time,Layer) %>% summarise( rate3 = mean(Zscore))  %>%  filter(between(rel_time,0,0.04))  %>% group_by(Behv,Layer) %>% summarise(max= max(rate3)) %>% mutate(norm_to_L5 = max / (max(max)), perc_change = -(1-norm_to_L5) *100)
 
 #ggsave("E:/Florian/Aligned_Data/Analysable_data/figures/what_are_layers.tiff", bg = "white")
 ```
@@ -269,8 +392,13 @@ Test4 <- Test4_org %>%  mutate(Zscore = Zscore - min(Zscore) +1) %>% mutate(acro
 
 # fit and test the model
 mod3 <-lme4::glmer(data= Test4, Zscore ~ Behv + Layer + Behv*Layer + (1 |Mouse) + (1 | Mouse:Session), family =  Gamma(link='inverse'))
+summary(mod3, type= 'response')
 mod0 <-lme4::glmer(data= Test4, Zscore ~ 1 + (1 |Mouse) + (1 | Mouse:Session), family =  Gamma(link='inverse'))
 
+
+se_effects <- sqrt(diag(vcov(mod3)))  # Standard errors in inverse scale
+original_scale_sd <- se_effects * (original_scale_means^2)
+summary(mod3)
 anova(mod3,mod0)
 
 
@@ -280,9 +408,9 @@ DHARMa::plotQQunif(res, testUniformity = F,testOutliers = F,testDispersion = F)
 
 #Post hoc
 # do test on model scale
-  
+library(emmeans)
 #overall Behv
-emmeans::emmeans(mod3, pairwise ~ Behv)
+g <- emmeans(mod3, pairwise ~ Behv,type='response')$contrast %>% as_tibble()
 
 
 # Behv conditional 
@@ -290,14 +418,15 @@ emmeans(mod3, pairwise ~ Behv| Layer)
 
 # overall Layer
 emmeans::emmeans(mod3, pairwise ~ Layer)
-
+t <-  emmeans(mod3, pairwise ~ Layer,type='response')$contrast %>% as_tibble()
 # layer conditional
 emmeans(mod3, pairwise ~Layer| Behv)
+t2 <-  emmeans(mod3, pairwise ~ Layer|Behv,type='response')$contrast %>% as_tibble()
 
 # for values, response scale
 
 
-
+?emmeans
 
 
 
@@ -379,7 +508,7 @@ ggsave('C:/Users/Freitag/Desktop/pvals_Behv_simp.tiff', bg='white')
 
 
 
-emmeans_Layer_simp <- emmeans::emmeans(mod31, ~ Layer , type = "response")
+emmeans_Layer_simp <- emmeans::emmeans(mod3, ~ Layer , type = "response")
 Layercon_simp <- emmeans::emmeans(mod3, pairwise ~ Layer)
 # Convert to tibble
 pdata <- emmeans_Layer_simp %>% as_tibble() 
@@ -424,8 +553,48 @@ Trialless %>% ggplot(aes(Behv, Zscore))+
 Trialless %>% filter(between(rel_time,0.01,0.04)) %>% group_by(Behv) %>% summarise(mean(Zscore))
 
 quantile(Trialless$Zscore)
+
+g
+t
+t2 %>% mutate(p.value = round(p.value,4))
+
+
+summary(mod3, type= 'response')
+
+emmeans(mod3, pairwise ~ Behv,type='response')
+
+library(equatiomatic)
+
+extract_eq(mod3,show_distribution = TRUE,use_coefs = TRUE)
+mod3
+
+broom::glance(mod3)
+broom::tidy(mod3)
+
+ 
 ```
 # plot for behv stats
+
+
+$$
+\begin{aligned}
+  
+    \alpha_{j}  &\sim N \left(0, 0.02 \right)
+    \text{, for Mouse:Session j = 1,} \dots \text{,J} \\
+    \alpha_{k}  &\sim N \left(0, 0.02 \right)
+    \text{, for Mouse k = 1,} \dots \text{,K}
+\end{aligned}
+$$
+$$
+\begin{aligned}
+    Zscore_{ijk} &\sim \text{Gamma}(\lambda_{ijk}) \quad \text{with } \lambda_{ijk} = \frac{1}{\eta_{ijk}} \\ 
+    \eta_{ijk} &= \beta_0 + \beta_1 \text{Behv}_i + \beta_2 \text{Layer}_j + \beta_3 (\text{Behv}_i \times \text{Layer}_j) + \alpha_k + \alpha_{jk} \\ 
+    \alpha_k &\sim N(0, \sigma^2_{\text{Mouse}}) \\ 
+    \alpha_{jk} &\sim N(0, \sigma^2_{\text{Session within Mouse}})
+\end{aligned}
+$$
+$$Zscore_{ijk} \sim \text{Gamma}(\lambda_{ijk}) \quad \text{with } \lambda_{ijk} = \frac{1}{\eta_{ijk}} \quad \\ \eta_{ijk} = \beta_0 + \beta_1 \text{Behv}_i + \beta_2 \text{Layer}_j + \beta_3 (\text{Behv}_i \times \text{Layer}_j) + \alpha_k + \alpha_{jk} \\ \alpha_k \sim N(0, \sigma^2_{\text{Mouse}}) \\ \alpha_{jk} \sim N(0, \sigma^2_{\text{Session within Mouse}})$$
+
 ```{r}
 emmeans_Behv_simp <- emmeans::emmeans(mod3, ~ Behv , type = "response")
 behvcon_simp <- emmeans::emmeans(mod3, pairwise ~ Behv)

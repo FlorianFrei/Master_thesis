@@ -3,7 +3,7 @@ title: "Waveform_analysis"
 output: html_document
 date: "2025-02-04"
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 ```{r}
@@ -13,30 +13,30 @@ source("C:/Users/Freitag/Documents/GitHub/Master_thesis/Analysis/Analysis/Master
 
 # load data - non Opto
 ```{r}
-Trialless <- read_csv("D:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Trialless.csv")
+Trialless <- read_csv("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Trialless.csv")
 
 
 
-metapath = "D:/Florian_paper/Florian/Aligned_Data/Analysable_data/meta"
+metapath = "E:/Florian_paper/Florian/Aligned_Data/Analysable_data/meta"
 list_of_meta <- list.files(path = metapath,
                              pattern = "\\.tsv$",
                              full.names = TRUE)
  meta <- read_tsv(list_of_meta, id = 'id2') %>%  as_tibble()%>% select(id2,cluster_id,n_spikes,depth,group,fr)
 meta <- meta %>% mutate(id = str_extract(meta$id2, "M\\d+_\\d+"))
 
-list_of_ptt <- list.files(path = "D:/Florian_paper/from_Desktop/peak_to_trough_times",
+list_of_ptt <- list.files(path = "E:/Florian_paper/Florian/Aligned_Data/Analysable_data/peak_to_trough_times",
                              pattern = "\\.csv$",
                              full.names = TRUE)
 ptt <- read_csv(list_of_ptt, id = 'id2') %>%  as_tibble()
 
-translator <- read_csv2("C:/Users/Freitag/Desktop/folder_contents.csv")
+translator <- read_csv2("E:/Florian_paper/Florian/Aligned_Data/Analysable_data/translator.csv")
 
 Trialless <- Trialless %>%  left_join(meta %>% left_join(ptt %>% separate(Original_Index, into = c("old", "second_part"), sep = "(?=_row)", extra = "merge", remove = FALSE) %>% left_join(translator) %>% select(second_part:new) %>% select(!Folder) %>% separate_wider_delim(second_part, delim ='_' ,names =c('d1','d2','cluster_id')) %>% select(cluster_id:new) %>% rename(id = new) %>% mutate(cluster_id = as.numeric(cluster_id)) %>% filter(`Peak_to_Valley (ms)` > 0)) %>% replace_na(list(`Peak_to_Valley (ms)`=0)) %>% mutate(newgroup = ifelse(`Peak_to_Valley (ms)`==0,group,'FS')) %>% filter(group!= 'noise', newgroup!= 'noise')) %>% select(Behv:Zscore, newgroup) %>% filter(newgroup!= 'noise')
 ```
 
 # Plot - non Opto
 ```{r}
-
+Trialless
 
     ord <- Trialless  %>% filter(between(rel_time,0,0.1)) %>% group_by(cluster_id2)  %>%
       filter(Behv == 'A2L') %>% group_by(cluster_id2) %>%
@@ -45,9 +45,8 @@ Trialless <- Trialless %>%  left_join(meta %>% left_join(ptt %>% separate(Origin
   
   
   
-  
   # z score and filter
-  g1 <- Trialless  %>% filter(between(rel_time,-1,1)) %>% select(Behv,cluster_id2,Zscore,rel_time,newgroup)
+  g1 <- Trialless  %>% filter(between(rel_time,-0.1,0.25)) %>% select(Behv,cluster_id2,Zscore,rel_time,newgroup)
   
 
   
@@ -60,15 +59,26 @@ Trialless <- Trialless %>%  left_join(meta %>% left_join(ptt %>% separate(Origin
     .default = 'Fuck'))
   
   #heatmap
-  map <-g1 %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
-    geom_tile()+
+  map <-g1 %>% mutate(Zscore= ifelse(Zscore > 12,12,Zscore))%>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_raster()+
     geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
     facet_grid(newgroup~Behv,scales = 'free',space = "free",switch = "y")+
-    scale_fill_gradient2(low = 'darkblue', mid = 'beige', high = 'red', midpoint = 0, limits = c(round(min(g1$Zscore)), round(max(g1$Zscore)*0.5)), breaks = c(round(min(g1$Zscore)),  round(max(g1$Zscore)*0.5)) ,na.value = "darkred")+
+    scale_fill_gradientn(colors = c("darkblue",'beige' ,"beige", "red"),
+                       values = scales::rescale(c(min(g1$Zscore), -0.65, 0, 12)),
+                       guide = guide_colorbar(
+                         ticks = FALSE,  # Remove intermediate ticks
+                        draw.ulim = FALSE,     # Remove top tick
+                         draw.llim = FALSE,   
+                        
+                       ),
+                       breaks = c(-2, 12))+
     theme_void()+
-    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
-          strip.text.x = element_text(size = 30),
-          strip.text.y = element_text(size = 20,angle = 90,margin = margin(r = 8)))+
+    theme(plot.margin = unit(c(0.1,0.2,0,0.7), 'lines'),
+          strip.text.x = element_text(size = 34),
+          strip.text.y = element_text(size = 34,angle = 90,margin = margin(r = 8)),
+          legend.text = element_text(size = 18),
+          legend.title = element_text(size = 22),
+          panel.clip='off')+
     labs(fill='Z- scored FR')+
     guides(fill = guide_colorbar(barheight = 10, barwidth = 2, ticks = FALSE)) 
   
@@ -79,19 +89,19 @@ Trialless <- Trialless %>%  left_join(meta %>% left_join(ptt %>% separate(Origin
     geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
     facet_grid(newgroup~Behv,,switch = "y")+
     theme_minimal()+
-    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+    theme(plot.margin = unit(c(0.1,0.2,0,0.7), 'lines'),
           strip.background = element_blank(),
           strip.text = element_blank(),
-          axis.text.y=element_blank(),
-          axis.title.x=element_text(size=20),
-          axis.title.y=element_text(size=18))+
+          axis.text.y = element_blank(),
+           axis.text.x=element_text(size=16),
+          axis.title=element_text(size=30))+
     xlab("time from stimulus")+
     ylab("Z-scored FR")
-  
+
   # arrange plots
   plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
                     ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
-  plot
+  print(plot)
 
   library(export)
 x11() # open graphics window
@@ -99,7 +109,7 @@ x11() # open graphics window
 
 
 print(plot)
-graph2tif(x= plot, file='C:/Users/Freitag/Desktop/waveform',
+graph2tif(x= plot, file='C:/Users/Freitag/Desktop/waveform_v2',
          width = dev.size(units="px")[[1]]/90,
          height = dev.size(units="px")[[2]]/90,
          dpi = 900)
@@ -126,6 +136,110 @@ dev.off()
     ylab("Z-scored FR")
    
    g1 %>% distinct(newgroup)
+   
+   
+library(patchwork)
+   
+ggrastr::rasterize(map) / smo + plot_layout(heights = c(2, 0.8), guides = "collect") & theme(legend.position = "right")
+ggrastr::rasterize(map) / smo + plot_layout(heights = c(2, 2), guides = "collect") & theme(legend.position = "right")
+
+
+g1 %>% group_by(Behv,rel_time,newgroup) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(newgroup~Behv,,switch = "y")+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,0.7), 'lines'),
+           axis.text=element_text(size=16),
+          axis.title=element_text(size=30))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+
+g1 %>% ggplot(aes(newgroup,Zscore))+
+  geom_boxplot()
+
+g1 %>% filter(between(rel_time,0,0.03))  %>% group_by(cluster_id2) %>% slice_max(Zscore)  %>% group_by(newgroup) %>% summarise(median = median(Zscore),mean= mean(Zscore), low = quantile(Zscore,0.25), high =  quantile(Zscore,0.75), bot = max( min(Zscore), (low-mean)*1.5), top = min( max(Zscore), mean+high*1.5)) %>% 
+  ggplot(aes(newgroup,mean))+
+  geom_pointrange(aes(ymax=high, ymin = low))+
+   geom_boxplot(
+    stat = "identity",
+    aes(lower  = low,
+        upper  = high,
+        middle = mean,
+        ymin   = bot, # optional
+        ymax   = top) # optional
+  )
+
+
+
+g1 %>% filter(between(rel_time,0,0.04)) %>% group_by(cluster_id2) %>% slice_max(Zscore) %>% group_by(newgroup) %>% summarise(median = median(Zscore),mean= mean(Zscore), low = quantile(Zscore,0.25), high =  quantile(Zscore,0.75), bot = max( min(Zscore), (low-mean)*1.5), top = min( max(Zscore), mean+high*1.5)) %>% 
+  ggplot(aes(newgroup,mean))+
+  geom_pointrange(aes(ymax=high, ymin = low))+
+   geom_boxplot(
+    stat = "identity",
+    aes(lower  = low,
+        upper  = high,
+        middle = median,
+        ymin   = bot, # optional
+        ymax   = top) # optional
+  )
+
+
+
+g1 %>% group_by(Behv,rel_time,newgroup) %>% filter(Behv == 'A2L') %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(~newgroup,,switch = "y")+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,0.7), 'lines'),
+           axis.text=element_text(size=16),
+          axis.title=element_text(size=30))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+
+
+
+plotly::ggplotly(
+ g1 %>% group_by(Behv,rel_time,newgroup) %>% filter(Behv == 'A2L') %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3,col=newgroup,fill=newgroup))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4)+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,0.7), 'lines'),
+           axis.text=element_text(size=16),
+          axis.title=element_text(size=30))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+
+)
+
+g1 %>% group_by(Behv,rel_time,newgroup) %>% filter(Behv == 'A2L') %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3,col=newgroup,fill=newgroup))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4)+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,0.7), 'lines'),
+           axis.text=element_text(size=16),
+          axis.title=element_text(size=30))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+ggsave('C:/Users/Freitag/Desktop/AA.tif', dpi = 900 , bg ='white')
+
+
+
+g1 %>% group_by(Behv,rel_time,newgroup) %>% filter(Behv == 'A2L') %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3,col=newgroup,fill=newgroup))+
+   geom_smooth(span=0.18)+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,0.7), 'lines'),
+           axis.text=element_text(size=16),
+          axis.title=element_text(size=30))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+
+Trialless %>% distinct(cluster_id2,newgroup) %>% count(newgroup)
 ```
 
 # Waveform stats
@@ -153,8 +267,9 @@ DHARMa::plotQQunif(res, testUniformity = F,testOutliers = F,testDispersion = F)
 
 library(emmeans)
 
-emmeans::emmeans(mod3, pairwise ~ newgroup)
-
+g<-emmeans::emmeans(mod3, pairwise ~ newgroup)
+g$contrasts %>% as_tibble()
+g$emmeans %>% as_tibble()
 # layer conditional
 laycon <- emmeans(mod3, pairwise ~newgroup| Behv)
 laycon
@@ -162,15 +277,15 @@ laycon
 
 
 
-emmeans_Behv_simp <- emmeans::emmeans(mod3, ~ newgroup , type = "response")
-behvcon_simp <- emmeans::emmeans(mod3, pairwise ~ newgroup)
+emmeans_Behv_simp <- emmeans::emmeans(mod3, ~ newgroup|Behv , type = "response",weights = 'proportional')
+behvcon_simp <- emmeans::emmeans(mod3, pairwise ~ newgroup|Behv, weights = 'proportional')
 # Convert to tibble
-pdata <- emmeans_Behv_simp %>% as_tibble() %>% mutate(newgroup = as.character(newgroup))
+pdata <- emmeans_Behv_simp %>% as_tibble() %>% mutate(newgroup = as.character(newgroup)) %>% filter(Behv == 'A2L')
 pdata <- pdata %>% mutate(newgroup = trimws(as.character(newgroup)))
 
 # Prepare p-values
 pvals <- behvcon_simp$contrasts %>%
-  as_tibble() %>%
+  as_tibble() %>% filter(Behv == 'A2L') %>% 
   separate_wider_delim(contrast, names = c("group1", "group2"), delim = "-") %>%
   mutate(psig = case_when(
     p.value < 0.001 ~'***',
@@ -185,25 +300,25 @@ pvals <- behvcon_simp$contrasts %>%
 # Plot
  ggplot(pdata %>% mutate(response = response + min(Test4_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(Test4_org$Zscore)-1) %>% mutate(newgroup = case_when(
     newgroup=='FS'~'FS',
-    newgroup=='good'~'regular',
+    newgroup=='good'~'RS',
     newgroup=='mua'~'inverted',
-    .default = 'Fuck')) %>% mutate(newgroup= factor(newgroup, levels=c("FS", "regular", "inverted"))), aes(x = newgroup, y = response)) +
-  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+    .default = 'Fuck')) %>% mutate(newgroup= factor(newgroup, levels=c("FS", "inverted","RS"))), aes(x = newgroup, y = response)) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2,  linewidth =1.3) +
   geom_point()+
-  geom_text(aes(label = round(response, 2)), hjust = -1) +
+  geom_text(aes(label = round(response, 2)), hjust = -0.5,size=5) +
   theme_minimal()+
   ylab('max Zscore response')+
   ggpubr::stat_pvalue_manual(pvals %>% mutate(response = response + min(Test4_org$Zscore)-1, asymp.LCL = asymp.LCL  + min(Test4_org$Zscore)-1, asymp.UCL = asymp.UCL  + min(Test4_org$Zscore)-1)  %>% mutate(group1 = case_when(
     group1=='FS'~'FS',
-    group1=='good'~'regular',
+    group1=='good'~'RS',
     group1=='mua'~'inverted',
     .default = 'Fuck')) %>% mutate(group2 = case_when(
     group2=='FS'~'FS',
-    group2=='good'~'regular',
+    group2=='good'~'RS',
     group2=='mua'~'inverted',
-    .default = 'Fuck')) %>%  mutate(y.position = asymp.UCL + 0.2, y.position = ifelse(group1=='FS' & group2=='inverted', y.position+0.2,y.position)), label = "psig", 
-                             xmin = "group1", xmax = "group2", y.position = "y.position")+
-  coord_fixed(ratio=0.4)
+    .default = 'Fuck')) %>%  mutate(y.position = asymp.UCL + 0.3, y.position = ifelse(group1=='FS' & group2=='inverted', y.position+0.4,y.position)), label = "psig", 
+                             xmin = "group1", xmax = "group2", y.position = "y.position", size=8,bracket.size=1)+
+  coord_fixed(ratio=0.3)
 ggsave('C:/users/Freitag/Desktop/waveform_stats.tiff', bg= 'white',dpi=900)
 
 
@@ -220,9 +335,9 @@ boxdata <- Test4_org  %>% group_by(newgroup) %>%
 ggplot(boxdata, aes(x=newgroup, ymin = min, lower = lower, middle = mean, upper = higher, ymax = max)) +
   geom_boxplot(stat = "identity")+
   theme_minimal()+
-   ggpubr::stat_pvalue_manual(pvals  %>% mutate(y.position = boxdata$max + 0.5, y.position = ifelse(group1=='FS' & group2=='mua', y.position+1,y.position)) %>% select(group1,group2,psig,y.position) %>% bind_cols(boxdata), label = "psig", 
+   ggpubr::stat_pvalue_manual(pvals  %>% mutate(y.position = boxdata$max + 0.3, y.position = ifelse(group1=='FS' & group2=='mua', y.position+1.5,y.position)) %>% select(group1,group2,psig,y.position) %>% bind_cols(boxdata), label = "psig", 
                              xmin = "group1", xmax = "group2", y.position = "y.position")
-  coord_fixed(ratio=0.5)
+  coord_fixed(ratio=0.2)
   
 ? ggpubr::stat_pvalue_manual
   
@@ -237,7 +352,17 @@ pr <-  Test4_org %>%  filter(newgroup != 'mua') %>% group_by(newgroup) %>% summa
    geom_boxplot()
  
  
- 
+Test4_org %>% group_by(newgroup) %>% summarise(Zm = mean(Zscore)) %>% mutate(norm_to_RS = Zm/3.319380, perc_change=  round(-(1- Zm/3.319380)*100,2))
+
+jtools::effect_plot(mod3, pred = newgroup)
+emmeans::emmeans(mod3, ~ newgroup , type = "response")
+
+g<-emmeans::emmeans(mod3, ~ newgroup,type='response')
+g%>% as_tibble() %>% ggplot(aes(newgroup,response))+
+  geom_errorbar(aes(ymin=asymp.LCL, ymax=asymp.UCL))
+emmeans::emmeans(mod3, pairwise~newgroup)
+
+
 
 ```
 
@@ -305,10 +430,10 @@ txtx =  g2  %>% distinct(cluster_id2, Layer, newgroup) %>% group_by(Layer,newgro
 
 # load data -  Opto
 ```{r}
-Trialless <- read_csv("D:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Trialless.csv")
+Trialless <- read_csv("E:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Trialless.csv")
 
 
-metapath = "D:/Florian_paper/Florian/Aligned_Data/otpo/meta"
+metapath = "E:/Florian_paper/Florian/Aligned_Data/otpo/meta"
 list_of_meta <- list.files(path = metapath,
                              pattern = "\\.tsv$",
                              full.names = TRUE)
@@ -317,7 +442,7 @@ list_of_meta <- list.files(path = metapath,
   
 
 
-list_of_ptt <- list.files(path = "D:/Florian_paper/Florian/Aligned_Data/otpo/PTT_times",
+list_of_ptt <- list.files(path = "E:/Florian_paper/Florian/Aligned_Data/otpo/PTT_times",
                              pattern = "\\.csv$",
                              full.names = TRUE)
 ptt <- read_csv(list_of_ptt, id = 'id2') %>%  as_tibble()
@@ -659,7 +784,7 @@ txtx =  g2  %>% distinct(cluster_id2, depthcat, newgroup) %>% group_by(depthcat,
     theme_void()+
     theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
           strip.text.x = element_text(size = 30),
-          strip.text.y = element_text(size = 20,angle = 270,margin = margin(r = 8)))+
+          strip.text.y = element_text(size = 30,angle = 270,margin = margin(r = 8)))+
      guides(fill = guide_colorbar(barheight = 10, barwidth = 2, ticks = FALSE)) 
     labs(fill='Z- scored FR') 
   

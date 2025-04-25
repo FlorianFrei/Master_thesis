@@ -3,7 +3,7 @@ title: "Opto_analysis"
 output: html_document
 date: "2025-01-24"
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 # load data and libraries
 ```{r,echo = FALSE,message = FALSE,warning = FALSE}
@@ -14,17 +14,11 @@ library(emmeans)
 
 source("C:/Users/Freitag/Documents/GitHub/Master_thesis/Analysis/Analysis/Master_helper.R")
 source("C:/Users/Freitag/Documents/GitHub/Master_thesis/Analysis/Data_wrangling/wrangling_helper.R")
-Trialless <- data.table::fread("D:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Trialless.csv")
+Trialless <- data.table::fread("E:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Trialless.csv")
 
-Trialless %>% summarise(range(depth))
 
-Data <- load_opto("D:/Florian_paper/Florian/Aligned_Data/otpo/Data","D:/Florian_paper/Florian/Aligned_Data/otpo/meta" )
+#Data <- data.table::fread("E:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Data.csv")
 
-Data %>% summarise(range(depth))
-
-Data %>% filter(id == 'O1_1') %>% distinct(cluster_id) %>% arrange(cluster_id)
-
-Trialless %>%filter(group == 'good') %>% distinct(id, cluster_id2) %>% group_by(id) %>% count()
 ```
 
 # overview plots
@@ -142,6 +136,304 @@ graph2tif(x= plot, file='C:/Users/Freitag/Desktop/Opto_overview',
 
 dev.off()
 
+```
+
+# one facet plot
+```{r}
+
+ord <- Trialless %>% filter(phase=='cortex')  %>% filter(between(rel_time,0,0.1)) %>% group_by(cluster_id2)  %>%
+      filter(Behv == 'Airpuff') %>% group_by(cluster_id2) %>%
+      summarise(ord = mean(Zscore)) %>%   arrange( ord)  %>% mutate(cluster_id2 = as.factor(cluster_id2)) %>% pull(cluster_id2)
+  
+  
+  
+  
+  
+  # z score and filter
+  g1 <-  Trialless  %>% filter(Behv2 %in% c('Airpuff','Opto_Air','just_opto')) %>% filter(between(rel_time,-1,1)) %>% select(phase,Behv,cluster_id2,Zscore,rel_time)
+  g1 <- g1 %>% group_by(phase) %>% complete(Behv,nesting(cluster_id2, rel_time), fill = list(Zscore = 0.1)) %>% filter(phase != 'NA')
+  g1 <- g1 %>% mutate(Behv = case_when(
+    Behv == 'just_opto' ~ 'Opto_only',
+    Behv == 'Opto_Air' ~'Airpuff + Opto',
+    Behv == 'Airpuff' ~ 'Airpuff',
+    .default = 'WTF'
+  ))%>% mutate(newf = case_when(
+    Behv == 'Airpuff' ~ 'Airpuff',
+     Behv == 'Airpuff + Opto' & phase == 'cortex' ~ 'Airpuff+S1_stim',
+     Behv == 'Airpuff + Opto' & phase == 'Thalamus' ~ 'Airpuff+PO_stim',
+    Behv == 'Opto_only' & phase == 'cortex' ~ 'S1_stim',
+     Behv == 'Opto_only' & phase == 'Thalamus' ~ 'PO_stim',
+    .default = 'UFF'))
+
+  g1$cluster_id2 <- factor(g1$cluster_id2, levels = ord)
+  
+
+  
+  #heatmap
+  mapA <-g1 %>%  mutate(Zscore= ifelse(Zscore > 8,8,Zscore)) %>%  filter(newf =='Airpuff'|newf=='Airpuff+S1_stim') %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_grid(~newf,scales = 'free', space='free')+
+     scale_fill_gradientn(colors = c("darkblue",'beige' ,"beige", "red"),
+                       values = scales::rescale(c(min(g1$Zscore), -0.65, 0, 8)),
+                       guide = guide_colorbar(
+                         ticks = FALSE,  # Remove intermediate ticks
+                        draw.ulim = FALSE,     # Remove top tick
+                         draw.llim = FALSE,   
+                        
+                       ),
+                       breaks = c(-2, 8))+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30),
+          strip.text.y = element_text(size = 20,angle = 270,margin = margin(r = 8)))+
+     guides(fill = guide_colorbar(barheight = 10, barwidth = 2, ticks = FALSE)) 
+    labs(fill='Z- scored FR') 
+  
+   #activity across all units
+  smoA<- g1 %>%filter(newf =='Airpuff'|newf=='Airpuff+S1_stim') %>%  group_by(newf,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(~newf)+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"),
+           strip.text.y = element_text(size = 20,angle = 270,margin = margin(r = 8)))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  plotA <- ggpubr::ggarrange(mapA, smoA, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plotA
+  x11() # open graphics window
+# now maximize this window so it is full screen
+
+
+print(plotA)
+graph2tif(x= plotA, file='C:/Users/Freitag/Desktop/plotA',
+         width = dev.size(units="px")[[1]]/90,
+         height = dev.size(units="px")[[2]]/90,
+         dpi = 900)
+
+
+  
+  
+  mapB <-g1 %>% mutate(Zscore= ifelse(Zscore > 8,8,Zscore)) %>%  filter(newf !='Airpuff') %>% ggplot(aes(rel_time,cluster_id2,fill=Zscore))+
+    geom_tile()+
+    geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
+    facet_grid(phase~Behv,scales = 'free', space='free')+
+     scale_fill_gradientn(colors = c("darkblue",'beige' ,"beige", "red"),
+                       values = scales::rescale(c(min(g1$Zscore), -0.65, 0, 8)),
+                       guide = guide_colorbar(
+                         ticks = FALSE,  # Remove intermediate ticks
+                        draw.ulim = FALSE,     # Remove top tick
+                         draw.llim = FALSE,   
+                        
+                       ),
+                       breaks = c(-2, 8))+
+    theme_void()+
+    theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
+          strip.text.x = element_text(size = 30),
+          strip.text.y = element_text(size = 20,angle = 270,margin = margin(r = 8)))+
+     guides(fill = guide_colorbar(barheight = 10, barwidth = 2, ticks = FALSE)) 
+    labs(fill='Z- scored FR') 
+  
+   #activity across all units
+  smoB<- g1 %>%filter(newf !='Airpuff') %>%  group_by(phase,Behv,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3))+
+    geom_line()+
+    geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    facet_grid(phase~Behv)+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"),
+           strip.text.y = element_text(size = 20,angle = 270,margin = margin(r = 8)))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+  
+  plotB <- ggpubr::ggarrange(mapB, smoB, heights = c(2, 0.8),vjust= c(0.5,0.5),
+                    ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
+  plotB
+  x11() # open graphics window
+# now maximize this window so it is full screen
+
+
+print(plotB)
+graph2tif(x= plotB, file='C:/Users/Freitag/Desktop/plotB',
+         width = dev.size(units="px")[[1]]/90,
+         height = dev.size(units="px")[[2]]/90,
+         dpi = 900)
+
+  
+ggpubr::ggarrange(plotA, plotB,vjust= c(0.5,0.5),
+                    ncol = 2, nrow = 1, align = "v",common.legend=T,legend = 'right')
+
+
+
+
+g1 %>%  left_join(g1 %>% filter(rel_time<0) %>% group_by(newf) %>% summarise(ma = mean(Zscore))) %>%  mutate(Zscore = Zscore - ma) %>% mutate(rel_time = ifelse(newf=='Airpuff', rel_time-0.02,rel_time)) %>% filter(between(rel_time,-0.02,0.5)) %>%  group_by(newf,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3, col= newf))+
+    geom_line()+
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"),
+           strip.text.y = element_text(size = 20,angle = 270,margin = margin(r = 8)))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+
+
+g1 %>%  left_join(g1 %>% filter(rel_time<0) %>% group_by(newf) %>% summarise(ma = mean(Zscore))) %>%  mutate(Zscore = Zscore - ma) %>%  filter(between(rel_time,-0.02,0.5)) %>%  group_by(newf,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3, col= newf))+
+    geom_line()
+    geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
+    theme_minimal()+
+    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=20,face="bold"),
+           strip.text.y = element_text(size = 20,angle = 270,margin = margin(r = 8)))+
+    xlab("time from stimulus")+
+    ylab("Z-scored FR")
+    
+    
+g1 %>% filter(rel_time<0) %>% group_by(newf) %>% summarise(ma = mean(Zscore))
+
+
+
+
+g1 %>%  left_join(g1 %>% filter(rel_time<0) %>% group_by(newf) %>% summarise(ma = mean(Zscore))) %>%  mutate(Zscore = Zscore - ma) %>% mutate(rel_time = ifelse(newf=='Airpuff', rel_time-0.02,rel_time)) %>% filter(between(rel_time,-0.02,0.5)) %>%  ungroup %>% ggplot(aes(rel_time,Zscore, col= newf))+
+ geom_smooth(method = "gam", formula = y ~ s(x, bs = "cs", fx = TRUE, k = 100))
+
+
+summs <- g1 %>%  left_join(g1 %>% filter(rel_time<0) %>% group_by(newf) %>% summarise(ma = mean(Zscore))) %>%  mutate(Zscore = Zscore - ma) %>% mutate(rel_time = ifelse(newf=='Airpuff', rel_time-0.02,rel_time)) %>% filter(between(rel_time,-0.02,0.5)) %>%  group_by(newf,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) 
+
+summs2 <- g1 %>%  left_join(g1 %>% filter(rel_time<0) %>% group_by(newf) %>% summarise(ma = mean(Zscore))) %>%  mutate(Zscore = Zscore - ma) %>% filter(between(rel_time,-0.02,0.5)) %>%  group_by(newf,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) 
+
+ggplot(aes(rel_time,rate3, col= newf))+
+  geom_line(method = "gam", formula = y ~ s(x, bs = "cs", fx = TRUE, k = 10))
+
+
+
+# ggsave("C:/Users/Freitag/Desktop/optoover1.tiff", bg= 'white', dpi = 900)
+
+
+g1 %>%  left_join(g1 %>% filter(rel_time<0) %>% group_by(newf) %>% summarise(ma = mean(Zscore))) %>%  mutate(Zscore = Zscore - ma) %>%  filter(between(rel_time,-0.02,0.5)) %>%  group_by(newf,rel_time) %>% summarise( rate3 = mean(Zscore), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(rel_time,rate3, col= newf))+
+  geom_smooth(span=0.1)
+# ggsave("C:/Users/Freitag/Desktop/optoover2.tiff", bg= 'white', dpi = 900)
+
+ggpubr::ggarrange(A,B)
+ggsave("C:/Users/Freitag/Desktop/optoover.tiff", bg= 'white', dpi = 900)
+
+
+
+raw <- g1 %>%  left_join(g1 %>% filter(rel_time<0) %>% group_by(newf) %>% summarise(ma = mean(Zscore))) %>%  mutate(Zscore = Zscore - ma) %>% mutate(rel_time = ifelse(newf=='Airpuff', rel_time-0.02,rel_time)) %>% filter(between(rel_time,-0.1,0.5)) %>%  ungroup()
+
+raw2 <- g1 %>%  left_join(g1 %>% filter(rel_time<0) %>% group_by(newf) %>% summarise(ma = mean(Zscore))) %>%  mutate(Zscore = Zscore - ma)  %>% filter(between(rel_time,-0.1,0.5)) %>%  ungroup()
+
+ggplot()+
+ geom_smooth(data = subset(raw,rel_time>0.02), aes(rel_time,Zscore, col= newf,fill=newf,linetype = newf),method = "gam", formula = y ~ s(x, bs = "cs", fx = TRUE, k = 10))+
+   geom_smooth(data = subset(raw,rel_time<=0.03), aes(rel_time,Zscore, col= newf,fill=newf,linetype = newf),method = "gam", formula = y ~ s(x, bs = "cs", fx = TRUE, k = 5))+
+  theme_minimal()+
+   scale_linetype_manual(values = c("solid", "dashed", "dashed","dotted","dotted"))
+
+
+
+library(scales)
+show_col(hue_pal()(3))
+
+raw2 <- g1 %>%  left_join(g1 %>% filter(rel_time<0) %>% group_by(newf) %>% summarise(ma = mean(Zscore))) %>%  mutate(Zscore = Zscore - ma)  %>% filter(between(rel_time,-0.1,0.4)) %>%  ungroup()
+
+ggplot()+
+ geom_smooth(data=raw2 %>% mutate(rel_time = rel_time*1000), aes(rel_time,Zscore, col= newf,fill=newf,linetype = newf),method = "gam", formula = y ~ s(x, bs = "cs", fx = TRUE, k = 35))+
+  geom_line(data=summs2%>% mutate(rel_time = rel_time*1000),aes(rel_time,rate3,col = newf))+
+   theme_minimal()+
+   scale_linetype_manual(values = c("solid", "dashed", "dashed","dotted","dotted"))+
+  geom_vline(aes(xintercept = 0))+
+  geom_vline(aes(xintercept = 16))+
+  geom_vline(aes(xintercept = 250))+
+  coord_fixed(ratio=100)
+ggsave('C:/Users/Freitag/Desktop/optooverlaydemo.tif', bg = 'white', dpi = 900)
+
+  # scale_color_manual(values=c("#F8766D","#00BA38", "#619CFF", "lightgreen" ,"lightblue"))+
+  # scale_fill_manual(values=c("#F8766D","#00BA38", "#619CFF", "lightgreen" ,"lightblue"))
+
+raw3 <- raw2 %>% rename('Stimulus' = newf) %>% mutate(rel_time = rel_time*1000)
+
+pov <- ggplot()+
+ geom_smooth(data=raw3, aes(rel_time,Zscore, col= Stimulus,fill=Stimulus,linetype = Stimulus),method = "gam", formula = y ~ s(x, bs = "cs", fx = TRUE, k = 35))+
+   theme_minimal()+
+   scale_linetype_manual(values = c("solid", "dashed", "dashed","dotted","dotted"))+
+  geom_vline(aes(xintercept = 0))+
+  geom_vline(aes(xintercept = 16))+
+  geom_vline(aes(xintercept = 250))+
+  xlab('time from stimulus')+
+  ylab('Z-scored FR')+
+  theme(
+    axis.title = element_text(size=20),
+    axis.text = element_text(size=12),
+    legend.text = element_text(size = 18),
+    legend.title = element_text(size = 26),legend.position = "inside",legend.position.inside = c(0.9,0.75))+
+  coord_cartesian(ylim = c(-1,3))
+ggsave('C:/Users/Freitag/Desktop/optooverlayreal.svg', bg = 'white', dpi = 900)
+
+x11() # open graphics window
+# now maximize this window so it is full screen
+
+
+print(pov)
+graph2svg(x= pov, file='C:/Users/Freitag/Desktop/plotpov',
+         width = dev.size(units="px")[[1]]/90,
+         height = dev.size(units="px")[[2]]/90)
+
+plotA +
+  theme(
+    strip.text = element_blank(),
+    axis.ticks = element_blank(),
+      axis.title = element_blank())+
+  theme_classic()
+
+
+x11() # open graphics window
+# now maximize this window so it is full screen
+
+
+print(plotA)
+graph2tif(x= plotA, file='C:/Users/Freitag/Desktop/plotA',
+         width = dev.size(units="px")[[1]]/90,
+         height = dev.size(units="px")[[2]]/90,
+         dpi = 900)
+
+
+
+library(ggfx)
+
+# Sample plot
+p <- ggplot(mtcars, aes(wt, mpg, color = factor(cyl))) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  theme(legend.position = "none")  # Hide default legend
+
+# Custom legend with blurred background
+p + 
+  with_blur(
+    annotate("label", x = 5, y = 30, 
+             label = "Cylinders:\n● 4\n● 6\n● 8", 
+             fill = "white", 
+             label.size = NA, 
+             hjust = 0, 
+             size = 5),
+    sigma = 5  # Increase for more blur
+  )
 ```
 
 
@@ -540,8 +832,10 @@ DHARMa::simulateResiduals(fittedModel = mod, plot = T,refit=F,use.u = T)
 plot(pairs(emmeans(mod, pairwise ~ Behv2 | phase)))
  
 ```
+
+
 ```{r}
-Testdatac = Trialless  %>% filter(phase =='cortex') %>% mutate(rel_time = ifelse(Behv2 =='Airpuff',rel_time-0.02,rel_time)) %>% filter(Behv2 %in% c('Airpuff','Opto_Air')) %>% mutate(rel_time = round(rel_time,2)) %>%  filter(between(rel_time, 0, 0.04))   %>% ungroup %>% mutate(timecat = as.factor(rel_time))  %>% mutate(Zscore = (Zscore - min(Zscore)) +1)
+Testdatac = Trialless  %>% mutate(rel_time = ifelse(Behv2 =='Airpuff',rel_time-0.02,rel_time)) %>% filter(Behv2 %in% c('Airpuff','Opto_Air')) %>% mutate(rel_time = round(rel_time,2)) %>%  filter(between(rel_time, 0, 0.04))   %>% ungroup %>% mutate(timecat = as.factor(rel_time))  %>% mutate(Zscore = (Zscore - min(Zscore)) +1)
 
 
 
@@ -553,9 +847,10 @@ Testdatac %>% group_by(Behv2, rel_time) %>% summarise(mz = mean(Zscore)) %>% ggp
   geom_line()
                        
 
-modc <- lme4::glmer(data = Testdatac , Zscore ~ Behv2*timecat  + (1|id), family = Gamma(link = 'inverse'))
+modc <- lme4::glmer(data = Testdatac , Zscore ~ Behv2*timecat  + phase+ (1|id), family = Gamma(link = 'log'))
 DHARMa::simulateResiduals(fittedModel = modc, plot = T,refit=F,use.u = T)
-emmeans(modc, pairwise ~ Behv2 | timecat, type = 'response')
+t<- emmeans(modc, pairwise ~ Behv2 | timecat)
+t$contrasts %>% as_tibble()
 
 
 
@@ -623,6 +918,9 @@ emmeans(modT, pairwise ~ Behv2 | timecat, type = 'response')
 
 plot(pairs(emmeans(modT, pairwise ~ Behv2|timecat)))
 plot(pairs(emmeans(modc, pairwise ~ Behv2|timecat)))
+
+
+Testdatac %>% group_by(Behv2, rel_time) %>% summarise(mz = mean(Zscore)) %>% arrange(rel_time) %>% group_by(rel_time) %>% mutate(norm = mz / mz[Behv2=='Airpuff'], perc_change = -(1-norm)*100)
 ```
 
 # test opto effect on Layers

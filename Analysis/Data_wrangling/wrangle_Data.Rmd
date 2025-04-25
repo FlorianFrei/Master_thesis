@@ -70,7 +70,7 @@ Trialless %>% write_csv("E:/Florian/Aligned_Data/Neuropixles_analysable/wrangled
 
 Data <- data.table::fread("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/final_combined_data.csv")
 
-Data %>% filter(event_count > 0) %>% tidyr::separate_wider_delim(id, delim = '_', names = c('Mouse','Day')) %>%  select(Mouse,Day, cluster_id,time_bin,event_count,Trialtype,Behv,Trial)  %>% uncount(weights = event_count) %>% mutate( time_bin = time_bin  + runif(n(), min = 0.001, max = 0.002) ) %>% write_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Zetadata.csv")
+Data %>% filter(event_count > 0) %>% tidyr::separate_wider_delim(id, delim = '_', names = c('Mouse','Day')) %>%  select(Mouse,Day, cluster_id,time_bin,event_count,Trialtype,Behv,Trial)  %>% uncount(weights = event_count) %>% mutate( time_bin = time_bin  + runif(n(), min = 0.001, max = 0.002) ) %>% write_csv("E:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Zetadata.csv")
 
 ```
 

@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 #%%
 
-Data = pd.read_csv("E:/Florian/Aligned_Data/Analysable_data/wrangled_Data/R_outputs/Zetadata.csv")
+Data = pd.read_csv("E:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Zetadata.csv")
 
 #%% for single tries
 
@@ -57,3 +57,19 @@ PC.to_csv(basefolder + str('/PC.csv'))
 Whisk.to_csv(basefolder + str('/Whisk.csv'))
 Lick_W2T.to_csv(basefolder + str('/lickW2T.csv'))
 Lick_A2L.to_csv(basefolder + str('/lickA2L.csv'))
+
+
+#%% Zeta opto
+pd.unique(Data['Behv'])
+pd.unique(Data['Trialtype'])
+
+Airpuff = ZetaMass(Data,'Airpuff','AirTop_noOpto',lag = 0, window = 0.2)
+Opto = ZetaMass(Data,'just_opto','justOpto',lag = 0, window = 0.2)
+Opto_Air =  ZetaMass(Data,'Opto_Air','AirTop_Opto',lag = 0, window = 0.2)
+
+#%%
+basefolder = "E:/Florian_paper/Florian/Aligned_Data/otpo/wrangled_Data/Zetatests"
+Opto.to_csv(basefolder + str('/Opto.csv'))
+Airpuff.to_csv(basefolder + str('/Airpuff.csv'))
+Opto_Air.to_csv(basefolder + str('/Opto_Air.csv'))
+
