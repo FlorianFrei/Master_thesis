@@ -126,6 +126,10 @@ stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>
 stat %>% mutate(time2 = ifelse(event_label == 'Airpuff', time2-(0.02),time2)) %>% 
   group_by(time2,event_label) %>% summarise( n= sum(event_count), nnorm =n/n_trials) %>% ungroup() %>% distinct() %>% group_by(time2,event_label) %>% summarise(nnorm = mean(nnorm)) %>% mutate(pp = ifelse(time2 > 0,'post','pre')) %>% group_by(pp, event_label) %>% summarise( mpsa = mean(nnorm))
 
+
+
+Plot_overview(Trialless %>% mutate(Behv = event_label, rel_time = time2) %>% filter(between(rel_time, -0.01,0.05)), orderby_Behv = 'JustOpto' )
+
 ```
 
 ```{r}
@@ -152,7 +156,7 @@ ord <- Trialless  %>% filter(between(time2,0,0.05)) %>% group_by(cluster_id2)  %
     geom_tile()+
     geom_vline(xintercept = 0, col ='grey',linetype = 'dashed')+
     facet_wrap(~event_label,scales = 'free')+
-    scale_fill_gradient2(low = 'dark
+    scale_fill_gradient2(low = 'dark')
     theme_void()+
     theme(plot.margin = unit(c(0,0.2,0,1), 'lines'),
           strip.text.x = element_text(size = 30))+
@@ -160,18 +164,12 @@ ord <- Trialless  %>% filter(between(time2,0,0.05)) %>% group_by(cluster_id2)  %
   
   
   #activity across all units
-  smo <- g1 %>% group_by(event_label,time2) %>% summarise(  rate3 = sum(Zscore) / n_distinct(cluster_id2), sd = sd(Zscore), se = sd/sqrt(n())) %>% ggplot(aes(time2,rate3))+
+g1 %>% group_by(event_label,time2) %>% summarise(  rate3 = sum(Zscore) / n_distinct(cluster_id2), sd = sd(Zscore), se = sd/sqrt(n())) %>% filter(event_label=='justOpto') %>%  filter(between(time2, -0.01,0.012)) %>% ggplot(aes(time2,rate3))+
     geom_line()+
     geom_smooth(method = 'loess', span =0.05)+
     geom_ribbon(aes(ymin = rate3-se, ymax = rate3+se),alpha = 0.4,fill = 'black')+
     geom_vline(xintercept = 0, col ='darkgrey',linetype = 'dashed')+
-    facet_wrap(~event_label)+
     theme_minimal()+
-    theme(plot.margin = unit(c(0.1,0.2,0,1), 'lines'),
-          strip.background = element_blank(),
-          strip.text.x = element_blank(),
-          axis.text=element_text(size=12),
-          axis.title=element_text(size=20,face="bold"))+
     xlab("time from stimulus")+
     ylab("Z-scored FR")
   
@@ -179,6 +177,8 @@ ord <- Trialless  %>% filter(between(time2,0,0.05)) %>% group_by(cluster_id2)  %
   plot <- ggpubr::ggarrange(map, smo, heights = c(2, 0.8),vjust= c(0.5,0.5),
                     ncol = 1, nrow = 2, align = "v",common.legend=T,legend = 'right')
   plot
+  
+  g1 %>% ungroup()%>% distinct(event_label)
 ```
 
 ```{r}

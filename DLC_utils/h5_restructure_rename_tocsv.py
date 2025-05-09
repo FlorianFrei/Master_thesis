@@ -15,7 +15,7 @@ from helpers import*
 
 #%%
 
-basefolder ="E:/Florian_paper/Florian/Data/batch3/M9_1"
+basefolder ="E:/Florian_paper/Florian/Data/batch3/M7_3"
 mat_name = next(file for file in os.listdir(basefolder) if file.endswith('.mat'))
 ITI = pd.read_csv(basefolder + str('/Meta/ttl_2.csv'))
 ITI = ITI.iloc[:,0]
@@ -51,7 +51,7 @@ matchto = BPOD[[ 'Trial','Trialtype','Time_Difference']].drop_duplicates().reset
 
 
 # Define the base directory where the H5 files are stored
-base_directory = "C:/Users/Freitag/Desktop/h5/h5/sessions/M9/M9_1"
+base_directory = "C:/Users/Freitag/Desktop/h5/h5/sessions/M7/M7_3"
 
 llist = []
 # Loop through all subdirectories and files
@@ -104,7 +104,9 @@ if len(llist) == len(matchto):
         df['Trial'] = matchto.loc[i, 'Trial']
         df['Time_Difference'] = matchto.loc[i, 'Time_Difference'] 
 else:
+    print('ewh what is that')
     if len(llist) > len(matchto):  # Fixed incorrect 'if:' syntax
+        print('maybe ok')
         llist2 = llist[:len(matchto)]  # Fixed 'matcho' typo
         for i, df in enumerate(llist2):
             df['Behv'] = matchto.loc[i, 'Trialtype']  
@@ -112,4 +114,4 @@ else:
             df['Time_Difference'] = matchto.loc[i, 'Time_Difference']
 #%%
 combined_df = pd.concat(llist, ignore_index=True)
-combined_df.to_csv('C:/Users/Freitag/Desktop/M9_1.csv')
+#combined_df.to_csv('C:/Users/Freitag/Desktop/M9_1.csv')
