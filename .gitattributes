@@ -2,4 +2,7 @@
 * text=auto
 *.Rmd linguist-language=R
 *.qmd linguist-language=R
+*.ipynb linguist-language=Jupyter Notebook
+*.ipynb -linguist-generated
+
 #*.ipynb linguist-language=Python
