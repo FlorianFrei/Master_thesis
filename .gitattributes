@@ -1,4 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=ignore
+*.html -linguist-detectable
+*.Rmd linguist-language=R
 *.qmd linguist-language=R
 *.ipynb linguist-language=Python
